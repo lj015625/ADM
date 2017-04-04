@@ -1,0 +1,651 @@
+---
+title: "Week 2 Basic Classification Models: knn, Decision Trees, and Logistic Regressions"
+author: "Xuan Pham"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# R Packages
+
+The packages you will need to install for the week are **knitr**, **class**, **gmodels**, **rpart**, **rpart.plot**, **caret**, **party**, and **partykit**. 
+
+
+# Classification Models
+
+Last week we used linear regression models to make numerical predictions (wages and insurance charges). Our task for this week is to create models that predict categorical class labels. In particular, we will look at two classifical models: **k-nearest neighbor (knn)** and **decision trees**.
+
+
+And in case you are wondering, we are still working with supervised learning algorithms. 
+
+# Background on the Drug Overdose Epidemic
+
+
+In 2015, Angus Deacon and Anne Case, economists (and husband and wife!) from Princeton University, published a [startling study](http://www.nytimes.com/2015/11/03/health/death-rates-rising-for-middle-aged-white-americans-study-finds.html). Deacon and Case found that mortality rate for middle aged (45 to 54 years old) non-Hispanic whites with a high school education or lower increased between 1999 and 2014, even though the mortality rates for all other age and racial groups were declining. This trend was happening even as the mortality rates of middle aged whites in other developed countries were declining. Deacon and Case found that the causes of death among less educated middle aged white Americans include suicide, alcohol, and drug overdose. 
+
+
+Since the publication of the Deacon & Case study, public interest in the drug overdose epidemic has increased. Gina Kolata and Sarah Cohen (2016) of the *New York Times* analyzed 60 million death certificates between 1999 and 2014 and found that the mortality rates among American non-Hispanic whites across all age groups under 65 years old were either rising or flattening. Kolata and Cohen reported: 
+
+**In 2014, the overdose death rate for whites ages 25 to 34 was five times its level in 1999, and the rate for 35- to 44-year-old whites tripled during that period. The numbers cover both illegal and prescription drugs....Rising rates of overdose deaths and suicide appear to have erased the benefits from advances in medical treatment for most age groups of whites** [Kolata and Cohen 2016](http://www.nytimes.com/2016/01/17/science/drug-overdoses-propel-rise-in-mortality-rates-of-young-whites.html).
+
+# Map of U.S. Opiate Overdose Death Rate
+
+[](https://www.kaggle.io/svf/441409/8c6ea1a2aa8cec052ca7959d43ad34a0/__results___files/figure-html/unnamed-chunk-21-1.png)
+
+
+
+# The Dataset
+
+We will be working with a dataset posted on [Kaggle](https://www.kaggle.com/apryor6/us-opiate-prescriptions) by Alan Pryor Jr. The dataset includes non-opioid prescription records and demographic information of 25,000 licensed medical professionals. The prescriptions were written for individuals covered under Class D Medicare. The source of the data is from the [Center for Medicare and Medicaid Services] (https://www.cms.gov/).
+
+The dataset contains the following information:
+
+*Gender of licensed medical professional
+
+*Number of prescriptions written for each of 239 common non-opiate drugs in 2014 by the licensed medical professional
+
+*A series of dummy variables for the state in which the medical professional practiced
+
+*A series of dummy variables for the medical professional's specialty
+
+*A factor variable named "Opioid.Prescriber" indicating whether the medical professional wrote at least 10 prescriptions for opioid drugs in 2014
+
+
+# Prediction Goal
+
+Can we build a model to predict whether a medical professional is likely to be an opioid prescriber? Additionally, can we identify predictors that tell us if a medical professional is more likely to prescribe opioids?
+
+
+# Exploratory Data Analysis
+
+```{r}
+setwd("C:/Users/PhamX/Courses/Spring_2017/BIA_6301/Module_2/data")
+prescribers<-read.csv("prescribers.csv")
+
+#View(prescribers)
+
+prescribers<-prescribers[,c(241,1:240,242:331)] #Rearranging the columns so that our target variable is first
+
+dim(prescribers)
+
+#run names() if you want to see the list of all the variables. 
+#names(prescribers)
+
+table(prescribers$Opioid.Prescriber)
+```
+
+
+# Classifical Models: A Two Step Process
+
+**Step #1: Model Construction**
+
+  * What is my class label? (yes/no)
+
+  * Build a training set (portion of the data used to build a prediction model)
+
+  * Choose a classification algorithm to fit the training set
+  
+  
+**Step #2: Model Usage**
+
+  * Run the classification algorithm on the test set
+
+  * Examine performance of the "prediction exercise" (i.e. Confusion Matrix)
+
+
+
+# k-Nearest Neighbor (kNN): A Lazy Classification Model
+
+First, a ![visualization] (http://blog.yhat.com/posts/classification-using-knn-and-python.html)
+
+kNN is called a "lazy learner" because it does not perform abstraction. Lantz (2013) noted:
+
+*In a single sentence, nearest neighbor classifiers are defined by their characteristics of classifying unlabeled examples by assigning them the class of the most similar labeled examples* (Lantz 2013, p. 66).
+
+When comparing among neighbors, we need to use a distance function. The most common way to measure distance is **Euclidean distance**, or the shortest direct route. 
+
+![](https://www.packtpub.com/sites/default/files/Article-Images/B03905_01_04.png)
+
+
+
+![](http://web.stonehill.edu/compsci/cs211/assignments/assign14.jpg)
+
+
+
+
+# How many neighbors (k)?
+
+
+When choosing the number of k, we need to consider the **bias-variance tradeoff**. A large k reduces the variance caused by noisy data but can cause bias in that we risk ignoring small (and important) patterns (Lantz 2013, p. 71).
+
+
+# kNN requires data transformation into a standard range
+
+
+## Min-Max Normalization
+
+![](https://cdn-images-1.medium.com/max/800/0*GQifNArAb4PPGJ6n.jpg)
+
+
+Also see page 73 of Lantz text
+
+
+In our prescribers dataset, we have two factors: Gender and Opioid.Prescriber. We will leave the Opioid.Prescriber alone since this is our target variable. We need to change Gender into a dummy variable so that it will be on the same 0,1 scale as our other variables (once we perform min-max normalization).
+
+
+```{r}
+prescribers$Male <-ifelse(prescribers$Gender=="M",1,0) #if Male = 1; if Female=0.
+prescribers<-prescribers[,-2] #We do not need the Gender variable anymore.
+
+#names(prescribers)
+```
+
+Here is the breakdown of the 331 variables:
+
+Column 1: target variable 
+
+Columns 2-240: number of prescriptions written for each non-opioid drug
+
+Columns 241-291: state dummy variables
+
+Columns 292-330: medical speciality dummy variables
+
+Column 331: dummy variable for male (i.e. gender)
+
+We need to do min-max normalization for columns 2-240 and then add that with our other colums (already on the 0-1 scale).
+
+
+```{r}
+drugs<-prescribers[,2:240]
+normalize<- function(x){return((x-min(x))/(max(x)-min(x)))}
+drugs_n<-as.data.frame(lapply(drugs, normalize))
+```
+
+
+
+Let's check our work to see if we did it correctly!
+
+
+```{r}
+summary(drugs$ABILIFY) #Range was between 0 and 770
+summary(drugs_n$ABILIFY) #Notice the range is now between 0 and 1
+```
+
+
+Now we are going to combine the normalized variables with our dummy variables and the target variable.
+
+
+```{r}
+prescribers_n<-cbind(prescribers[,c(1,241:331)], drugs_n[,])
+
+prescribers_n<-prescribers_n[complete.cases(prescribers_n),]
+```
+
+
+# Train and Test Sets
+
+We divide our dataset into two subsets: training set and a test set. We use the training set to "train" our kNN model. We then use that model to predict the observations in our test set. This is how we gauge the performance of our prediction model. We will split our dataset into 80-20 (80% training and 20% test sets). 
+
+
+```{r}
+prescribers_n_train <- prescribers_n[1:20000,2:331]
+prescribers_n_test <- prescribers_n[20001:25000,2:331]
+
+prescribers_n_train_labels<-prescribers_n[1:20000,1]
+prescribers_n_test_labels<-prescribers_n[20001:25000,1]
+```
+
+
+We will use the **class** package to perform kNN.  
+
+Lantz (2015) suggested starting with k = square root of the number of observations & using an odd k (page 82). sqrt(20000) = 141.
+
+Previous tests found that k=15 gives the highest accuracy rate for this data set.
+
+```{r}
+library(class)
+set.seed(123)
+prescribers_pred_knn<-knn(train=prescribers_n_train, test=prescribers_n_test, cl=prescribers_n_train_labels, k=15)
+```
+
+
+# Evaluating Model Performance
+
+
+
+![](http://rasbt.github.io/mlxtend/user_guide/evaluate/confusion_matrix_files/confusion_matrix_1.png)
+
+
+You have to decide what is a "positive" versus a "negative" case in your dataset! We will label a positive case as someone who did prescribe opioids more than 10 times in 2014. A negative case is someone who did not.
+
+```{r}
+library(gmodels)
+
+CrossTable(x=prescribers_n_test_labels, y=prescribers_pred_knn, prob.chisq=FALSE)
+
+```
+
+
+```{r}
+TP = 2265
+TN = 1542
+FP = 509
+FN = 684
+
+Sensitivity = TP/(TP+FN) #true positive rate; recall; TP/(TP+FN)
+Specificity = TN/(TN+FP) #how often is the prediction negative when actual is negative?
+Precision = TP/(TP+FP) #how often is prediction positive when actual is positive?
+Accuracy = (TP+TN)/(TP+TN+FP+FN) #how often is classifier correct
+
+
+Value<-round(c(TP,TN,FP,FN,Sensitivity,Specificity,Precision,Accuracy),digits=3)
+Measure<-c("True Positive","True Negative","False Positive","False Negative","Sensitivity/Recall=TP/(TN+FP)",
+         "Specificity=TN/(TN+TP)","Precision=TP/(TP+FP)","Accuracy=(TP+TN)/total")
+
+table<-as.data.frame(cbind(Measure,Value))
+
+library(knitr)
+
+kable(table)
+```
+
+
+Here is a good link http://www.dataschool.io/simple-guide-to-confusion-matrix-terminology/ with a short tutorial on confusion matrix. 
+
+
+
+# Using the caret package
+
+```{r}
+# take a very long time
+# k = 15 was chosen. 
+#set.seed(123)
+#library(caret)
+#trainIndex <- createDataPartition(prescribers$Opioid.Prescriber, p = .8,list = FALSE,times = 1)
+#prescribers_train_caret <- prescribers[ trainIndex,]
+#prescribers_test_caret <- prescribers[ -trainIndex,]
+
+#library(caret)
+
+#set.seed(123)
+#prescribers_pred_knn_caret <- train(Opioid.Prescriber ~ ., data=prescribers_train_caret, method="knn",metric="Accuracy", tuneLength=20)
+
+#prescribers_pred_knn_caret
+
+#system.time(prescribers_pred_knn_caret)
+```
+
+
+# Z score standardization
+
+![](https://s-media-cache-ak0.pinimg.com/originals/70/db/af/70dbaf3b130b15f952abadf8d6f10fbf.jpg)
+
+
+![](https://statistics.laerd.com/statistical-guides/img/Standard_Score_Calc.gif)
+
+```{r}
+prescribers_z <- as.data.frame(scale(prescribers[-1]))
+
+summary(prescribers$ABILIFY)
+
+summary(prescribers_z$ABILIFY) #notice that the max value is not compressed towards 1.
+
+prescribers_z_train<-prescribers_z[1:20000, ]
+prescribers_z_test<-prescribers_z[20001:25000, ]
+
+prescribers_z_train_labels<-prescribers[1:20000,1]
+prescribers_z_test_labels<-prescribers[20001:25000,1]
+
+set.seed(123)
+prescribers_z_pred <- knn(train=prescribers_z_train, test=prescribers_z_test, cl=prescribers_z_train_labels, k=15)
+
+gmodels::CrossTable(x=prescribers_z_test_labels, y=prescribers_z_pred, prop.chisq = FALSE)
+```
+
+```{r}
+TP = 2219
+TN = 1442
+FP = 609
+FN = 730
+
+Sensitivity = TP/(TP+FN) #true positive rate; recall; TP/(TP+FN)
+Specificity = TN/(TN+FP) #how often is the prediction negative when actual is negative?
+Precision = TP/(TP+FP) #how often is prediction positive when actual is positive?
+Accuracy = (TP+TN)/(TP+TN+FP+FN) #how often is classifier correct
+
+
+Value<-round(c(TP,TN,FP,FN,Sensitivity,Specificity,Precision,Accuracy),digits=3)
+Measure<-c("True Positive","True Negative","False Positive","False Negative","Sensitivity/Recall=TP/(TN+FP)",
+         "Specificity=TN/(TN+TP)","Precision=TP/(TP+FP)","Accuracy=(TP+TN)/total")
+
+table<-as.data.frame(cbind(Measure,Value))
+
+library(knitr)
+
+kable(table)
+```
+
+
+# Decision Trees: A More Sophisticated Classification Model
+
+
+Decision trees follow recursive partitioning (top down greedy divide and conquer approach)
+
+1. Choose the attribute that is most predictive of the target variable
+
+2. Observations in the training data set are divided into groups of distinct values. This form the first set of branches.
+
+3. Continue to divide and conquer the nodes, choosing the feature with the most prediction power each time until one of three conditions occur:
+
+* all observations for a given node belong to the same class
+
+* no more remaining attributes for further partitioning
+
+* no observations are left
+
+
+
+# Splitting Criterion
+
+![](https://image.slidesharecdn.com/08classbasic-140913212207-phpapp02/95/data-miningconcepts-and-techniques-chapter-8-classification-basic-concepts-13-638.jpg?cb=1410644460)
+![](https://image.slidesharecdn.com/08classbasic-140913212207-phpapp02/95/data-miningconcepts-and-techniques-chapter-8-classification-basic-concepts-16-638.jpg?cb=1410644460)
+![](https://image.slidesharecdn.com/08classbasic-140913212207-phpapp02/95/data-miningconcepts-and-techniques-chapter-8-classification-basic-concepts-17-638.jpg?cb=1410644460)
+
+
+
+# Creating a Training and Test Set by Randomizing Observations
+
+
+```{r}
+set.seed(123) #set a seed to do draws from a random uniform distribution.
+prescribers_rand <- prescribers[order(runif(25000)), ] 
+prescribers_train <- prescribers_rand[1:20000, ] #Training data set; 20000 observations
+prescribers_test  <-prescribers_rand[20001:25000, ]
+```
+
+
+# Using rpart to Build a Decision Tree
+
+```{r}
+library(rpart)
+
+set.seed(123)
+prescribers_rpart <- rpart(prescribers_train$Opioid.Prescriber~., method="class", parms = list(split="gini"), data=prescribers_train)
+
+
+#More on the method options: 
+# a. method="class" --> categorical (yes/no) 
+# b. method="anova" --> continuous 
+# c. method="poisson" --> count
+# d. method="exp" --> survival analysis (in poverty/out of poverty)
+
+#More on the parms option:
+#a. The default splitting criterion is the Gini Index. 
+```
+
+# Root, Nodes, and Leaves
+
+```{r}
+summary(prescribers_rpart)
+```
+
+# Visualizing the Decision Tree
+
+
+```{r}
+plot(prescribers_rpart, uniform=TRUE, main="Classification Tree for Opioid Prescribers")
+text(prescribers_rpart, use.n=TRUE, all=TRUE, cex=0.8)
+
+
+# Something a bit fancier
+library(rpart.plot)
+rpart.plot(prescribers_rpart, type=0, extra=101)
+```
+
+
+The leaves show the opioid vs. non-opioid prescribers after the split at that node.   
+
+The blue indicates the majority in that subgroup is non-opioid prescribers (negatives). The green indicates the majority in that subgroup is opioid prescribers (positives).  
+
+The label (yes or no) at each node indicates the label of the majority subgroup (“yes” or “no” for being opioid prescribers).  
+
+Starting from the top, we have:  
+
+First split (Levothyroxine.sodium): There were 4,888 medical professionals who prescribed levothyroxine.sodium more than 22 times. Of these people, 4,409 were opioid prescribers and 479 who were not opioid prescribers. This subgroup makes up 24% of the training set [(4,888/20,000)*100% = 0.24].  
+
+Second split (Surgeon): There were 1,347 people out of this 15,112 subgroup who were surgeon (7% of the training set). Of these surgeons, 1,240 were opioid prescribers and 107 who were not opioid prescribers. 
+And so on...
+
+```{r}
+rpart.plot(prescribers_rpart, type=1, extra=101)
+```
+
+The leaves show the opioid vs. non-opioid prescribers.  
+
+The nodes show the opioid vs. non-opioid prescribers before the next split.  
+
+The blue indicates the majority in that subgroup is non-opioid prescribers (negatives). The green indicates the majority in that subgroup is opioid prescribers (positives).  
+
+The label (yes or no) at each node indicates the label of the majority subgroup (“yes” or “no” for being opioid prescribers).  
+
+Starting from the top, we have:  
+
+20,000 people in training set: 8,225 who were not opioid prescribers, and 11,775 who were opioid prescribers. Since the majority of this group were opioid prescribers, the node is green and labeled as “yes.”
+First split (Levothyroxine.sodium): There were 4,888 medical professionals who prescribed levothyroxine.sodium more than 22 times. Of these people, 4,409 were opioid prescribers and 479 who were not opioid prescribers. This subgroup makes up 24% of the training set [(4,888/20,000)*100% = 0.24].  
+
+Now there were 15,112 people who prescribed levothyroxine.sodium less than 22 times (or 76% of the training set). Of this subgroup, 7,746 were not opioid prescribers and 7,366 who were opioid prescribers. Since the majority of this subgroup were not opioid prescribers, the node is blue and “no” is labeled.  
+
+Second split (Surgeon): There were 1,347 people out of this 15,112 subgroup who were surgeon (7% of the training set). Of these surgeons, 1,240 were opioid prescribers and 107 who were not opioid prescribers.  
+
+Now there were 13,765 who did prescribed levothyroxine.sodium less than 22 times AND were not surgeons. Of these people, 7,639 people who were not opioid prescribers and 6,126 people were opioid prescribers.
+And so on….
+
+
+
+# Even fancier?
+```{r}
+library(party)
+library(partykit)
+prescribers_party<-as.party(prescribers_rpart)
+plot(prescribers_party)
+```
+
+
+Check out this [vignette](http://www.milbo.org/rpart-plot/prp.pdf) on plotting rpart objects with rpart.plot(). A good resource for formatting your decision trees.
+
+# A Note on the Drugs in Decision Tree
+
+LEVOTHROXINE.SODIUM: used to treat underactive thyroid (hypothyrodism).  
+
+MELOXICAM: nonsteroid anti-inflammatory drug.  
+
+PREDNISONE: uses to decease immune system's responses to reduce sweling and allergic-type reactions.  
+
+SPIRIVA: controls and prevents symptons caused by ongoing lung disease.  
+
+SULFAMETHOZAZOLE.TRIMETHOPRIM: uses to treat wide variety of bacterial infections & certain type of pneumonia.  
+
+
+# Evaluating Model Performance
+
+
+```{r}
+library(caret)
+actual <- prescribers_test$Opioid.Prescriber
+predicted <- predict(prescribers_rpart, prescribers_test, type="class")
+results.matrix <- confusionMatrix(predicted, actual, positive="yes")
+print(results.matrix)
+```
+
+
+
+# Using the Complexity Parameter (CP Value) to Prune the Decision Tree
+
+```{r}
+cptable<-printcp(prescribers_rpart)
+cptable
+set.cp.value<-cptable[which.min(cptable[,"xerror"]),"CP"]
+
+Pruned_prescribers_rpart <- prune(prescribers_rpart, cp=set.cp.value)
+
+rpart.plot(Pruned_prescribers_rpart, type=0, extra=101)
+```
+
+
+Well, that did not do anything! The tree is the same as before. This is due to the fact that the CP value continues to decrease with more splits. Time to try something else!
+
+
+# Visualizing Cross Validation Results
+
+
+This plots the size of tree (nsplit+1) on top and the complexity parameter at the bottom (x-axis). The red line is the minimum cross validated error (or xerror) + one standard deviation (or xstd). 
+
+
+```{r}
+cptable<-printcp(prescribers_rpart)
+cptable
+plotcp(prescribers_rpart, minline=TRUE, col="red") 
+```
+
+
+# Picking a Tree Size
+
+Method 1: Look for the "elbow" in the CP plot. Set the tree size at the cp value where the "elbow" occurs.
+
+Method 2: Pick the cp value that is within one standard deviation of the minimum xerror (the red line).
+
+Method 3: Manually prune the tree until desired result is achieved.
+
+
+```{r}
+Pruned_prescribers_rpart <-prune(prescribers_rpart,cp=.07) #Change the cp and see what happens.
+
+plot(Pruned_prescribers_rpart, uniform=TRUE,main="Classification Tree for Opioid Prescribers")
+text(Pruned_prescribers_rpart, use.n=TRUE, all=TRUE, cex=.8)
+
+rpart.plot(Pruned_prescribers_rpart, type=1, extra=101)
+
+Pruned_prescribers_party<-as.party(Pruned_prescribers_rpart)
+plot(Pruned_prescribers_party)
+```
+
+
+```{r}
+actual <- prescribers_test$Opioid.Prescriber
+predicted <- predict(Pruned_prescribers_rpart, prescribers_test, type="class")
+results.matrix <- confusionMatrix(predicted, actual, positive="yes")
+print(results.matrix)
+```
+
+How does accuracy look? Sensitivity? Specificity?
+
+# Exploring rpart.control
+
+You should play around with rpart.control to do additional tree pruning.
+
+```{r}
+#help(rpart.control)
+```
+
+# Logistic Regression
+
+We fit the logistic regression using maximum likelihood. The idea behind maximum likelihood is that we seek estimates for B's such that the predicted probability corresponds as closely as possible to the observed data. See here for more details:  
+
+https://en.wikipedia.org/wiki/Maximum_likelihood
+
+Also refer to Section 4.3.2 in **James et al.** (page 133).
+
+## Train Model
+
+```{r}
+prescribers_train_logit<-prescribers_train[,c(1,126,139,186,206,209,328,298)]
+
+prescribers_train_logit$LEVOTHYROXINE.SODIUM.recode<-ifelse(prescribers_train_logit$LEVOTHYROXINE.SODIUM<22,"no","yes")
+
+prescribers_train_logit$MELOXICAM.recode<-ifelse(prescribers_train_logit$MELOXICAM<6,"no","yes")
+
+prescribers_train_logit$PREDNISONE.recode<-ifelse(prescribers_train_logit$PREDNISONE<6,"no","yes")
+
+prescribers_train_logit$SPIRIVA.recode<-ifelse(prescribers_train_logit$SPIRIVA<6,"no","yes")
+
+prescribers_train_logit$SULFAMETHOXAZOLE.TRIMETHOPRIM.recode<-
+  ifelse(prescribers_train_logit$SULFAMETHOXAZOLE.TRIMETHOPRIM<6,"no","yes")
+
+prescribers_train_logit[,c(2:6)]<-NULL
+
+names(prescribers_train_logit)
+
+prescriber.logit <- glm(Opioid.Prescriber~.+PREDNISONE.recode:SPIRIVA.recode+PREDNISONE.recode:SULFAMETHOXAZOLE.TRIMETHOPRIM.recode, data=prescribers_train_logit, family=binomial()) #Fit a logistic regression
+summary(prescriber.logit) #coefficients are presented as log-odds (probabilities on logit scale)
+
+exp(cbind(Odds_Ratio=coef(prescriber.logit))) #Take exponent of log odds gives "odds" ratio.
+
+```
+
+The odds of an Emergency Medicine (EM) doctor prescribing opioids is 27 times higher than their non-EM counterparts. 
+
+The odds of a Surgeon prescribing opioids is 18 times higher than their non-Surgeon counterparts.
+
+And so on...
+
+
+# Is the Logistic Regression Model Statistically Significant?
+
+To see whether the model is statistically significant, we can use anova(). Note below that we should see the residual deviance decreasing with each additional predictor being added to the null model. If the addition of a predictor does not decrease the residual deviance by much, we should consider excluding that predictor from our model. 
+
+```{r}
+anova(prescriber.logit,test="Chisq") 
+```
+
+## Validate Model
+
+```{r}
+prescribers_test_logit<-prescribers_test[,c(1,126,139,186,206,209,328,298)]
+
+prescribers_test_logit$LEVOTHYROXINE.SODIUM.recode<-ifelse(prescribers_test_logit$LEVOTHYROXINE.SODIUM<22,"no","yes")
+
+prescribers_test_logit$MELOXICAM.recode<-ifelse(prescribers_test_logit$MELOXICAM<6,"no","yes")
+
+prescribers_test_logit$PREDNISONE.recode<-ifelse(prescribers_test_logit$PREDNISONE<6,"no","yes")
+
+prescribers_test_logit$SPIRIVA.recode<-ifelse(prescribers_test_logit$SPIRIVA<6,"no","yes")
+
+prescribers_test_logit$SULFAMETHOXAZOLE.TRIMETHOPRIM.recode<-
+  ifelse(prescribers_test_logit$SULFAMETHOXAZOLE.TRIMETHOPRIM<6,"no","yes")
+
+prescribers_test_logit[,c(2:6)]<-NULL
+```
+
+
+### Prediction as log-odds
+
+```{r}
+prescribers_test_logit$predict.opioid.prescriber<-predict(prescriber.logit, newdata=prescribers_test_logit) #the predictions are in log-odds. Not user friendly. 
+```
+
+
+### Prediction as odd ratios
+```{r}
+prescribers_test_logit$predict.opioid.prescriber<-predict(prescriber.logit, newdata=prescribers_test_logit,type="response") #convert into probabilities.
+
+#probability = exp(log odds)/[1 + exp(log odds))]
+#same as probability = odds/(1+odds)
+```
+
+
+### 95% confidence interval for predicted probability
+```{r}
+prescribers_test_logit[,9]<-NULL
+
+prescribers_test_logit_CI<-cbind(prescribers_test_logit,predict(prescriber.logit, newdata=prescribers_test_logit,type="link",se=TRUE))
+                                 
+prescribers_test_logit_CI <- within(prescribers_test_logit_CI, 
+  {
+    PredictedProb <- plogis(fit)
+    LL <- plogis(fit - (1.96 * se.fit))
+    UL <- plogis(fit + (1.96 * se.fit))
+    })                               
+                                 
+```
+
+
+
