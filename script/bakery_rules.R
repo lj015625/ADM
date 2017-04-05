@@ -1,7 +1,7 @@
 #playing with bakery data
 library(arules)
 library(arulesViz)
-bake <- read.csv("")
+bake <- read.csv("C:/Users/lj015625/Desktop/DataMining Class/Applied_Data_Mining/data/bakery-binary.csv")
 names(bake)
 bake <- bake[-51]
 bake_basket <- as(as.matrix(bake), "transactions")
@@ -41,11 +41,11 @@ apriori(bake_basket) #Not a single rule found!
 
 #Let's try again. Support = 0.001. Confidence = 0.1. Minlen = 2. Feel free to change the parameter settings. 
 bakerules <- apriori(bake_basket, parameter = list(support =
-                                                      0.01, confidence = 0.5, minlen = 2)) 
+                                                      0.01, confidence = 0.8, minlen = 1)) 
 
 
 #Count the number of rules found
 
 summary(bakerules)
 
-inspect(bakerules[1:5])
+inspect(bakerules[1:50])
