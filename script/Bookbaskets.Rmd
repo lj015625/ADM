@@ -1,0 +1,253 @@
+---
+title: "Book displays at Flourish and Blotts"
+author: "Leonardo Ji"
+date: '`r Sys.Date()`'
+---
+
+###Questions
+
+We did this work to find a way to arrange the book displays in order to increase sales at Flourish and Blotts bookstore.  The data set given us contains 90,000+ historical sales transactions and we want to answer the following questions:
+
+1.	What are the best-selling titles? 
+2.	If the manager has to create a book display to appeal to readers who belong to book clubs, what books should be included? He said that the typical book club audience would be someone who is reading titles featured by Opraha's Book Club (https://static.oprah.com/images/o2/201608/201608-obc-complete-list-01a.pdf). 
+3.	Can you recommend other books that he should include in display cases? The manager is adamant that your recommendations do not include the following:
+a.	Books in a series (i.e. Girl with the Dragon Tattoo series would be an example). The manager already knows series books should be displayed together.
+b.	The title "Wild Animus" You were really surprised by this request and pressed the manager for an explanation. He replied that you should read this blog entry: https://litreactor.com/columns/what-the-hell-is-wild-animus
+
+###Data
+Load 'Matrix', 'arules', 'arulesViz' packages.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+library(Matrix)
+library(arules)
+library(arulesViz)
+library(knitr)
+```
+
+First we Read zip file separated by tabs, specify the column of transaction IDs and of item IDs, remove duplicate entries.
+
+```{r}
+bookbaskets <- read.transactions("C:/Users/lj015625/Desktop/DataMining Class/HW4/data/bookdata.tsv.gz", 
+                                 format="single",  	 
+                                 sep="\t",                    	 
+                                 cols=c("userid", "title"),    	
+                                 rm.duplicates=T)       	
+```
+We can see there are 92,108 transactions and 220,447 customers.
+This creates a sparse matrix of books by transactions.
+
+
+```{r}
+# 92,108 book purchases.
+#220,447 user IDs.
+inspect(bookbaskets[1:5]) #Examine the first five transactions
+dim(bookbaskets)
+summary(bookbaskets)
+```
+
+The density is 0.005%, this means most of values in transaction dataset are 0.
+The image graph shows sparse matrix of the sample of 100 transactions.
+```{r}
+image(sample(bookbaskets, 100))
+```
+
+
+####**To answer the first question "what is the top selling books" we need to do the following**
+- First we calculate how many of the same books customers bought. This number is also called support. $Support = Count(X)$
+- Then we calculate frequency/relative support of books by dividing its support to total count.  $Relative Support = Count(X)/N$
+- Then we sort overall book count to get top twenty most popular books. 
+
+
+```{r}
+basketSizes<-size(bookbaskets) 
+# Calculate the support for each book title 
+bookFreq<-itemFrequency(bookbaskets)
+# Get the absolute count of book occurrences. 
+bookCounts <- (bookFreq/sum(bookFreq))*sum(basketSizes) 
+# High frequency items
+orderedBooks = sort(bookCounts, decreasing = TRUE)
+#head(orderedBooks, 10)
+
+orderedBooks_df <- as.data.frame(orderedBooks)
+orderedBooks_df$title <- rownames(orderedBooks_df)
+rownames(orderedBooks_df) <- 1:nrow(orderedBooks_df)
+colnames(orderedBooks_df) <- c("Support", "Title")
+orderedBooks_df <- orderedBooks_df[c("Title", "Support")]
+kable(orderedBooks_df[1:20,], caption = "Top 20 Books")
+```
+####Support plots
+The first graph shows relative support books above 0.8%.
+The below second graph shows top twenty books purchased.
+
+```{r}
+#Let's plot the frequency of items
+# Support number low because lower frequency on books inside dataset.
+# Let's impose a rule. Let's say we only want to see items with at least 0.8% support
+itemFrequencyPlot(bookbaskets, support = 0.008)
+#Now let's say we only want to see "top 30" items (i.e. 20 items most frequently purchased)
+itemFrequencyPlot(bookbaskets, topN = 20)
+```
+
+### Model
+
+We need an association rule model to list strong rules. For example, a customer buys book 1 also buys book 2.  This is similar to recommending items to purchase on Amazon.com.
+We also want to remove large transaction with more than 200 books.  Those larger transaction with more than 200 books are treated as outliers.  
+They are not typical book store customers' transactions.  We will remove it.  We also removed single book transaction because association rule needs at least two items.
+Association Rules by Apriori method is good for this purpose. Apriori method works well on any transaction data set.
+It creates a search tree of item set then prune the tree use minimal support and confidence value.
+The method eventually returns rules of associated items. 
+Rules follow the format like items on left hand side return Items on the right hand side.
+For this rule we know associated items.
+
+To start Apriori method first we want to keep only those transactions when customer bought more than one book.  
+A single book transaction would not be useful for this model.
+
+```{r}
+#Only keep transactions with more than one book and let than 200 books purchased. 
+bookbaskets_use<-bookbaskets[basketSizes>1 & basketSizes<200] 
+basketSizes<-size(bookbaskets_use) 
+```
+
+####**Question 2 ask us to create a list of book for customers who follows Oprahs Book Club.**
+
+There are 56 books in Oprah Book Club.   
+We want to know how many of those same books also existed in the transaction data set. 
+There are fifty-six book titles in Oprah Book Club intersect with titles in customers' transaction data set.
+
+
+```{r}
+oprahBookClub <- read.csv("C:/Users/lj015625/Desktop/DataMining Class/HW4/data/oprahBookClub.csv")
+orderedBooks_df <- as.data.frame(orderedBooks)
+oprahBookClub_intersect <- intersect(rownames(orderedBooks_df), oprahBookClub$Title)
+length(oprahBookClub_intersect)
+```
+
+Use Oprah Book Club books on the left hand side rule of the Apriori algorithm.  
+This would give us what other books we should display for a typical Oprah Book Club reader.
+We did trial and errors and end up picking support 0.0003, confidence at 0.6, minimum length at 2, maximum length at 5.
+The support concept is stated in previous section. We also specify a minimal confidence number.
+While support measures How often does the rule happen. Confidence measures how often is the rule correct. 
+$confidence(X->Y) = (support(X,Y))/(support(X))$
+
+```{r}
+oprahRule_df_total_df <- data.frame(rules=factor(),
+                                        support=double(),
+                                        Factors=double(),
+                                        lift=double(),
+                                        stringsAsFactors=FALSE)
+oprahRule <- apriori(bookbaskets_use, parameter = list(support = 0.00003, confidence = 0.6, minlen = 2, maxlen = 5),
+                  appearance=list(lhs=c(oprahBookClub_intersect), default="rhs"))
+oprahRule_sorted <- sort(oprahRule, by = c("lift", "confidence"))
+oprahRule_df <- as(oprahRule_sorted, "data.frame")
+```
+**We can sort rules by lift.  The table below shows titles in the transaction data set 
+could appeal to readers who belong to Oprah's Book Club.**
+
+```{r}
+kable(oprahRule_df[order(-oprahRule_df$lift), ], caption = "Oprah Book Club Association Rules")
+```
+
+####**Question 3 asks us to identify additional books We want to recommend for display. **
+We can run Apriori Association Rules using all books in transaction data set and using a higher relative support value.
+This would give us a list of books customers most likely to read.
+We sorted resulting rules by lift and confidence. Lift measures "how much more likely an item is to be purchased relative to its typical purchase rate, given that you know another item has been purchased" (Lantz 2013, p. 261).
+$Lift = Confidence/Support$
+
+
+```{r}
+bookbasketrules <- apriori(bookbaskets_use, parameter = list(support = 0.001, confidence = 0.8, minlen = 2, maxlen = 10))
+#print(bookbasketrules)
+summary(bookbasketrules)
+
+# sort rules by lift and confidence
+bookbasketrules_sorted <- sort(bookbasketrules, by = c("lift", "confidence"))
+#inspect(bookbasketrules_sorted[1:10])
+
+bookbasketrules_sorted_df <- as(bookbasketrules_sorted, "data.frame")
+#length(bookbasketrules_sorted_df$rules)
+kable(bookbasketrules_sorted_df[1:10,], caption = "Top Ten Association Rules")
+```
+
+There are ninty-eight rules.  We can plot them on a scatter plot.  We want to pick higher confidence and higher lift rules,
+basically all those rules on the top right corner. Most of rule has greater than 0.001 relative support and 0.8 confidence.
+
+```{r}
+plot(bookbasketrules_sorted)
+```
+
+We can enhance rules scatter plot by adding order color shading.  Higher order rules have higher color shading.
+The highest number of order is 5.
+
+```{r}
+##A two-key plot
+plot(bookbasketrules_sorted, shading="order", control=list(main="Two-key plot"))
+```
+
+We can also create a grouped matrix plot for eighty-four rules.  
+The second plot limit to top ten rules.
+
+```{r}
+## Grouped Matrix Plot
+plot(bookbasketrules_sorted, method="grouped") 
+plot(bookbasketrules_sorted, method="grouped", control=list(k=10)) 
+```
+
+Graph Based Visualizations are helpful to visualize smaller set of rules.
+We can use it to display first ten rules.  For example, "Key of Knowledge" on the left hand side leads to "key of Light" on the right hand side.
+
+```{r}
+plot(bookbasketrules_sorted[1:10], method="graph")
+plot(bookbasketrules_sorted[1:10], method="graph", control=list(type="itemsets"))
+```
+
+**If we want to exclude title "Wild Animus" then we can rerun Apriori without this title. **
+
+```{r}
+bookbasketsRule_noAnimus <- apriori(bookbaskets_use, parameter = list(support = 0.001, confidence = 0.8, minlen = 2, maxlen = 10),
+appearance = list(none = c("Wild Animus")))
+bookbasketsRule_noAnimus_sorted <- sort(bookbasketsRule_noAnimus, by = c("lift", "confidence"))
+#inspect(bookbasketsRule_noAnimus_sorted[1:20])
+bookbasketsRule_noAnimus_sorted_df <- as(bookbasketsRule_noAnimus_sorted, "data.frame")
+kable(bookbasketsRule_noAnimus_sorted_df[1:20,], caption = "Top Twenty Books without 'Wild Animus'")
+```
+
+**We also want to exclude those books in a series.  Then we can rerun the apriori exclude books in a series**
+**If we also want to exclude those books in a series then we can rerun the Apriori algorithm and exclude those books in a series**
+In this case when we exclude the Stephanie Plum crime series, Lord of the Ring series, Harry Potter series, The Green Miles series.
+We used the same 0.001 support and 0.8 confidence threshold.
+
+```{r}
+excludeList <- c("Wild Animus", "Three To Get Deadly : A Stephanie Plum Novel", "Four to Score", "Seven Up", "High Five", "Hot Six : A Stephanie Plum Novel", "Two for the Dough",
+                 "The Fellowship of the Ring", "The Return of the King", "The Two Towers", 
+                 "Harry Potter and the Sorcerer's Stone", "Harry Potter and the Order of the Phoenix", "Harry Potter and the Prisoner of Azkaban", 
+                 "Harry Potter and the Chamber of Secrets", "Harry Potter and the Goblet of Fire",
+                 "The Green Mile: Night Journey", "The Green Mile: Coffey on the Mile", "The Green Mile: The Bad Death of Eduard Delacroix")
+bookbasketsRule_series <- apriori(bookbaskets_use, parameter = list(support = 0.001, confidence = 0.8, minlen = 2, maxlen = 5),  appearance = list(none = excludeList))
+summary(bookbasketsRule_series)
+bookbasketsRule_series_sorted <- sort(bookbasketsRule_series, by = c("lift", "confidence"))
+#inspect(bookbasketsRule_series_sorted)
+bookbasketsRule_series_sorted_df <- as(bookbasketsRule_series_sorted, "data.frame")
+kable(bookbasketsRule_series_sorted_df[1:15,], caption = "Top Books not in a series")
+```
+
+If we do a subset to list all rules from title "Key of Knowledge" then we get list of three rules related to title "Key of Knowledge".
+We can do the same for other interesting titles. The itemset plot shows this subset of rules on one title very well.
+```{r}
+subsetRules <- subset(bookbasketsRule_series_sorted, items %in% "Key of Knowledge")
+subsetRules_df <- as(subsetRules, "data.frame")
+kable(subsetRules_df, caption = "Key of Knowledge subset")
+plot(subsetRules, method="graph", control=list(type="itemsets"))
+```
+
+
+###Commentary
+- We listed top twenty bestselling books from customers' transaction data set.  
+
+- Oraph Book Club has fifty-six books in our transaction data set.  From those fifty-six books we discovered rules that book club reader would like to read.  For example, "The Treasure Hunt" and "True Crime: The Novel".  We can use the list to appeal book club readers.  The resulting rules are listed above.
+
+- The book club rules have smaller support because they are not popular books in our customers' transaction data set.  If we use transactions with more than one book and less than two hundred books, then we can get stronger rules, those with higher relative support and confidence.  And if we excluded "Wild Animus" book, and books in a series then we get books from the same author or books on the same topic.  For example, "Key of Knowledge" and "Key of Valor" both written by same author.  Top fifteen associated rules are listed above.
+
+
+
+END
