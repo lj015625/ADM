@@ -1,0 +1,366 @@
+---
+title: "Improving Term Deposit Client Base"
+author: "Leonardo Ji"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+##Questions
+
+We were hired by Hometown Bank to help the company understands and improves status in the term deposit market. We decided to use larger 40,000 rows data set (bank-full.csv).  We want to classify "y..category", which refers to whether the client has subscribed a term deposit. It is a factor with two levels: "yes" or "no."
+Hometown Bank wants to know given what we know of each clients what caused them to subscribe term deposit and what we recommend to increase term deposit.  
+
+
+##Data
+There data contains 40,000 rows.  It appears 88.3% of rows' "y..category" are no.  We created a training set (40691 rows) and validation set (4520 rows) using 
+random sampling. Then we verified both training data set and validation set have the very close percentage (88.3%) of "y..category" set to "no".
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+library(caret)
+library(rpart.plot)
+library(party)
+library(partykit)
+library(ipred)
+library(randomForest)
+library(adabag)
+library(e1071)
+library(plyr)
+library(fastAdaboost)
+library(nnet)
+```
+
+
+```{r}
+bankFull<-read.csv("C:/Users/lj015625/Desktop/DataMining Class/HW5/data/bank-full.csv")
+dim(bankFull)
+names(bankFull)
+summary(bankFull)
+table(bankFull$y..category)
+```
+
+```{r}
+set.seed(123)
+trainIndex <- createDataPartition(bankFull$y..category, p = 0.9, list = FALSE, times = 1)
+bankFull_train <- bankFull[ trainIndex,]
+bankFull_validate <- bankFull[ -trainIndex,]
+dim(bankFull_train) #checking the split
+dim(bankFull_validate) #checking the split
+prop.table(table(bankFull_train$y..category)) #checking to see the class proportions between the training and test sets. 
+prop.table(table(bankFull_validate$y..category))
+```
+
+##Classification Models
+
+We need supervised learning classification models to classify "y..category" variable.  When this variable is yes this means clients subscribed term deposit.
+
+###Model 1: Rpart Decision Tree 
+
+The decision tree model is the first model we want to use.  We fit the whole training data set on a decision tree.
+We want a model has high Sensitivity $Sensitivity=\frac{True Positive}{True Positive + False Negative}$ because we want to predict clients who subscribed term deposit. Since we do not worry about predicting no "y..category" higher accuracy rate is not important to us.
+The kappa statistic $Kappa=\frac{Pr(a) - Pr(e)}{1-Pr(e)}$ adjusts accuracy by accounting for the possibility of a correct prediction by chance alone. We can compare Kappa statistic to know which model is better if both models have the same sensitivity.  
+
+
+```{r}
+set.seed(123)
+bank_yCat_rpart <- rpart(y..category ~., method="class", parms = list(split="gini"), minsplit = 20, data=bankFull_train)
+cptable<-printcp(bank_yCat_rpart)
+cptable
+set.cp.value<-cptable[which.min(cptable[,"xerror"]),"CP"]
+Pruned_bank_yCat_rpart <- prune(bank_yCat_rpart, cp=set.cp.value)
+```
+
+
+```{r}
+#rpart.plot(Pruned_bank_yCat_rpart, type=0, extra=101)
+#rpart.plot(Pruned_bank_yCat_rpart, type=1, extra=101)
+# partykit looks better than rpart.plot
+plot(as.party(Pruned_bank_yCat_rpart))
+```
+
+
+Finally we can use the decision tree model to predict "y:category" using validation data set and create a confusion matrix.
+The confusion matrix contains the number of rows we predicted correctly or incorrectly.
+From confusion matrix we can get sensitivity ratio.
+Even though we get a 90.18% overall accuracy rate, the sensitivity is only 36.93%.
+The decision tree model is not very good at predicting yes "y..category".
+
+
+```{r}
+# use a function to print result.
+getResult<- function(bankFullModel, predictType, testData)
+{
+  actual <- testData$y..category
+  predicted <- predict(bankFullModel, testData, type=predictType)
+  results.matrix <- confusionMatrix(predicted, actual, positive="yes")
+  print(results.matrix)
+}
+
+getResult(bank_yCat_rpart, "class", bankFull_validate)
+```
+
+####10-fold cross validation
+
+Cross validation is a technique that estimate model performance.  Cross validation randomly divides training data set to ten folds. Then we select one fold as validation set and nine folds as training set to evaluate the model.  Then we select a different validation set, rest of nine folds as training data set, and repeat this same process again for ten times until we get the best final model.  After we run 10-fold cross validation the final decision tree model's sensitivity is still low at 34.09%.
+
+
+```{r}
+# 10-fold cross validation
+fitControl <- trainControl(method="cv", number=10) 
+set.seed(123)
+bankFull_10folds<-train(y..category ~., data=bankFull_train, method="rpart", metric="Accuracy", trControl=fitControl)
+#bankFull_10folds
+
+getResult(bankFull_10folds, "raw", bankFull_validate)
+
+bankFull_10folds_pruned<-prune(bankFull_10folds$finalModel, cp=0.01932367)
+plot(as.party(bankFull_10folds_pruned))
+```
+
+####10-fold cross validation repeat 5 times
+
+Sometimes repeating the cross validation improves result.  
+However, we repeated 10-fold cross validation five times but we did not get a better sensitivity rate.  We have the same result.
+
+```{r}
+# Repeated 10-fold cross validation
+fitControl <- trainControl(method="cv", number=10, repeats=5) 
+set.seed(123)
+bankFull_10folds_5repeat<-train(y..category ~., data=bankFull_train, method="rpart", metric="Accuracy", trControl=fitControl)
+#bankFull_10folds_5repeat
+
+getResult(bankFull_10folds_5repeat, "raw", bankFull_validate)
+
+bankFull_10folds_5repeat_pruned<-prune(bankFull_10folds_5repeat$finalModel, cp=0.01932367)
+plot(as.party(bankFull_10folds_5repeat_pruned))
+```
+
+####Boostrapping
+
+Bootstrap sampling use random samples of data to estimate the larger data set.  The result of ten random samples are averaged to obtain final result.
+Again we did not get a better sensitivity rate.
+
+
+```{r}
+# Bootstrapping 
+bootCtrl <- trainControl(method="boot", number=10) #10 bootstrapped samples.
+set.seed(123)
+bankFull_bootstrap<-train(y..category ~., data=bankFull_train, method="rpart", metric="Accuracy", trControl=bootCtrl)
+#bankFull_bootstrap
+
+getResult(bankFull_bootstrap, "raw", bankFull_validate)
+```
+
+####Bagging
+
+The Ensemble methods are works well by using mutiple models for prediction. 
+Bagging or bootstrap aggregating works by creating multiple Bootstrap samples and generate multiple decision tree models.
+The prediction is generated from voting or averaging from multiple decision tree models predictions.
+Bagging works well on unstable method like decision tree model. It gave us a slightly better sensitivity rate.  
+
+```{r}
+# Bagging
+library(ipred)
+set.seed(123)
+bankFull_bagging <- bagging(y..category ~., data = bankFull_train, nbagg = 100)
+#bankFull_bagging
+actual <- bankFull_validate$y..category
+baggingPredicted <- predict(bankFull_bagging, newdata=bankFull_validate, type="class") 
+results.matrix <- confusionMatrix(baggingPredicted$class, actual, positive="yes")
+print(results.matrix)
+```
+
+####Bagging Cross Validation
+
+In addition to bagging by Bootstrap samples, we can use ten-fold cross validation.  The prediction result gave us a better sensitivity rate 46.59%.
+
+```{r}
+# Bagging cross validation treebag
+fitControl <- trainControl(method = "cv", number = 10) 
+bankFull_treebag <- train(y..category ~., data = bankFull_train, method = "treebag", metric="Accuracy", na.action=na.omit, trControl = fitControl)
+#summary(bankFull_treebag)
+getResult(bankFull_treebag, "raw", bankFull_validate)
+```
+
+####Random Forest
+
+Random forest method is another Ensemble method.  In random forest model decision tree node splits are not dominated by a few strong predictors, this gives other random predictors more chance to being used.  We tested random forest that use only three predictors and 500 trees. Random forest has a higher sensitivity rate 46.97%.
+
+
+```{r}
+# Random Forest
+library(randomForest)
+set.seed(123) 
+#default to try three predictors at a time and create 500 trees. 
+bankFull_RForest <- randomForest(y..category ~., data=bankFull_train, mtry=3, ntree=500, na.action = na.omit, importance=TRUE) 
+print(bankFull_RForest) 
+importance(bankFull_RForest) 
+varImpPlot(bankFull_RForest) 
+
+getResult(bankFull_RForest, "class", bankFull_validate)
+```
+
+####Boosting
+
+Boosting decision tree is another Ensemble model.  It fits the decision tree to the entire training set, then add another tree for misclassified observations to the existing tree.  Boosting algorithm runs slowly.  The sensitivity rate is 43.18%.
+
+
+```{r}
+# Boosting (Very SLOW use 2 fold cross validation)
+library(adabag) #a popular boosting algorithm
+set.seed(123)
+bankFull_adaboost <- boosting.cv(y..category ~., data=bankFull_train, boos=TRUE, v=2) #.cv is adding cross validation
+#don't worry about warning message. Also, this take a while to run.
+bankFull_adaboost$confusion #confusion matrix for boosting
+bankFull_adaboost$error #error rate for boosting (OOB)
+bankFull_adaboost_accuracy <- 1 - bankFull_adaboost$error #accuracy rate for boosting (OOB)
+bankFull_adaboost_accuracy
+```
+
+
+[Adaboost algorithm in Caret package](https://topepo.github.io/caret/train-models-by-tag.html#boosting)
+
+```{r}
+# Boosting (Very SLOW use 2 fold cross validation)
+fitControl <- trainControl(method="cv", number=2) 
+set.seed(123)
+bankFull_boost<-train(y..category ~., data=bankFull_train, method="adaboost", metric="Accuracy", trControl=fitControl)
+#summary(bankFull_boost)
+
+getResult(bankFull_boost, "raw", bankFull_validate)
+```
+
+###Model 2: Logistic Regression
+
+We used the significant variables from Random Forest decision tree for the logistic regression model.
+The sensitivity is 38.06% not as good as Random Forest model.  But we can see duration, p outcome, contact category, month category (except February) are significant terms. Although the sensitivity of this model is low, we learned the following:
+
+- Previous marketing campaign success increases the chance of client subscribe a term deposit.
+- Last contact during high increases the chance of client subscribe a term deposit while last contact during low decreases the chance of client subscribe a term deposit.
+- Unknown contact category decreases the chance client subscribe a term deposit.
+- The month of March, May, June, September, October, December increases the chance client subscribe a term deposit.
+
+
+[Logistic Regression method in caret package](https://topepo.github.io/caret/train-models-by-tag.html#logistic-regression)
+
+```{r}
+# Logistic Regression
+bankFull_train <- bankFull[ trainIndex,]
+bankFull_validate <- bankFull[ -trainIndex,]
+
+bankFull_train$poutcome..category_success <- ifelse(bankFull_train$poutcome..category=="success",1,0)
+bankFull_train$contact..category_unknown <- ifelse(bankFull_train$contact..category=="unknown",1,0)
+bankFull_train$duration..number_low <- ifelse(bankFull_train$duration..number<132,1,0)
+bankFull_train$duration..number_High <- ifelse(bankFull_train$duration..number>=808,1,0)
+
+bankFull_logit_train <- bankFull_train[,c(11,17:21)]
+
+bankFull_validate$poutcome..category_success <- ifelse(bankFull_validate$poutcome..category=="success",1,0)
+bankFull_validate$contact..category_unknown <- ifelse(bankFull_validate$contact..category=="unknown",1,0)
+bankFull_validate$duration..number_low <- ifelse(bankFull_validate$duration..number<132,1,0)
+bankFull_validate$duration..number_High <- ifelse(bankFull_validate$duration..number>=808 ,1,0)
+
+bankFull_logit_validate <- bankFull_validate[,c(11,17:21)]
+
+fitControl <- trainControl(method = "cv", number = 10)
+set.seed(123)
+bankFull_lg <- train(y..category ~., data=bankFull_logit_train, method="glm", family="binomial", trControl = fitControl)
+summary(bankFull_lg)
+getResult(bankFull_lg, "raw", bankFull_logit_validate)
+```
+
+
+###Model 3: Neural Network cross validation
+
+The black box Neural Network model produced best sensitivity rate 49.2%.  We also used five-fold cross validation on training data set.
+
+[Neural Network in Caret package](https://topepo.github.io/caret/train-models-by-tag.html#neural-network)
+
+```{r}
+bankFull_train <- bankFull[ trainIndex,]
+bankFull_validate <- bankFull[ -trainIndex,]
+
+cvControl <- trainControl(method="cv", number=2)
+set.seed(123)
+bankFull_nn <- train(y..category ~ ., data=bankFull_train, method = "nnet", trControl = cvControl)
+#summary(bankFull_nn)
+getResult(bankFull_nn, "raw", bankFull_validate)
+```
+
+###ROC curves
+The ROC (receiver operating characteristics) curve displays the true positive rate (sensitivity) against the false positive rate (specificity). 
+The Random Forest ROC curve is the best model because it follows the left hand border and then the top left border of the ROC space.
+
+
+```{r}
+#ROC 
+#Create a ROC curve
+library(ROCR)
+
+R10Fold_predict_prob<-predict(bankFull_10folds, type="prob", bankFull_validate)
+R10Fold_pred = prediction(R10Fold_predict_prob[,2], bankFull_validate$y..category)
+R10Fold_perf = performance(R10Fold_pred,"tpr", "fpr") #true pos and false pos
+
+RForest_predict_prob<-predict(bankFull_RForest, type="prob", bankFull_validate)
+RForest_pred = prediction(RForest_predict_prob[,2], bankFull_validate$y..category)
+RForest_perf = performance(RForest_pred,"tpr", "fpr") #true pos and false pos
+
+RBagging_predict_prob<-predict(bankFull_treebag, type="prob", bankFull_validate)
+RBagging_pred = prediction(RBagging_predict_prob[,2], bankFull_validate$y..category)
+RBagging_perf = performance(RBagging_pred,"tpr", "fpr") #true pos and false pos
+
+RBoost_predict_prob<-predict(bankFull_boost, type="prob", bankFull_validate)
+RBoost_pred = prediction(RBoost_predict_prob[,2], bankFull_validate$y..category)
+RBoost_perf = performance(RBoost_pred,"tpr", "fpr") #true pos and false pos
+
+RLogit_predict_prob<-predict(bankFull_lg, type="prob", bankFull_logit_validate)
+RLogit_pred = prediction(RLogit_predict_prob[,2], bankFull_validate$y..category)
+RLogit_perf = performance(RLogit_pred,"tpr", "fpr") #true pos and false pos
+
+RNN_predict_prob<-predict(bankFull_nn, type="prob", bankFull_validate)
+RNN_pred = prediction(RNN_predict_prob[,2], bankFull_validate$y..category)
+RNN_perf = performance(RNN_pred,"tpr", "fpr") #true pos and false pos
+
+
+# Start plotting
+plot(R10Fold_perf, main="ROC Curves", col="black", lwd=2)
+plot(RForest_perf, add=TRUE, col="red", lwd=2)
+plot(RBagging_perf, add=TRUE, col="green", lwd=2)
+plot(RBoost_perf, add=TRUE, col="blue", lwd=2)
+plot(RLogit_perf, add=TRUE, col="cyan", lwd=2)
+plot(RNN_perf, add=TRUE, col="brown", lwd=2)
+abline(a=0, b=1, lwd=2, lty=2, col="gray")
+legend('bottomright', c("Decision Tree", "Random Forest","Bagging", "Boost", "Logistic Regression", "Neural Network"), 
+       lty=c(1,1), lwd=c(2.5,1), col=c("black","red","green", "blue", "cyan", "brown"))
+```
+
+##Summary
+
+At the end of day, we created four different models to estimate the chance of client subscribe term deposit: Decision tree model, Logistic Regression, and Neural Network. 
+*Neural Network has the best sensitivity rate*, *Random Forest has the best ROC curve*. 
+We used variety of ensemble methods (Random Forest, Boosting, Bagging) for decision tree model because a single decision tree model is unstable.  All of them have a higher sensitivity rates.  Out of all three Ensemble Methods Bagging with ten-fold Cross Validation produced a model with the best sensitivity rate.  
+  
+
+| Methods                          | Sensitivity    |   Kappa        |
+| -------------------------------- |:--------------:| --------------:|
+| Decision Tree                    | 34.09%         |   39.24%       |
+| DT Bagging                       | 49.62%         |   50.26%       |
+| DT Random Forest                 | 46.97%         |   50.47%       |
+| DT Boosting                      | 43.18%         |   45.83%       |
+| Logistic Regression              | 37.69%         |   42.82%       |
+| Neural Network                   | 49.81%         |   48.84%       |
+
+
+
+Logistic Regression model did not have the best sensitivity rate but it confirmed what factors leads to improve the client subscribe term deposit.  The successful previous marketing campaigns lead to higher term deposit, higher contact duration leads to higher term deposit, unknown contact category lower term deposit, month of March, May, June, September, October, December increase term deposit.  Based on these findings here are our recommendations to increase term deposit:
+
+- *Bank contacts clients using telephone or cellular more often and longer duration*.
+- *Bank does more successful marketing campaigns in month of March, May, June, September, October, December*.  
+
+
+
+
+
+END
