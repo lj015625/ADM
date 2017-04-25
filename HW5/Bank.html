@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
 
@@ -615,12 +615,12 @@ getResult(bankFull_boost, &quot;raw&quot;, bankFull_validate)</code></pre>
 </div>
 <div id="model-2-logistic-regression" class="section level3">
 <h3>Model 2: Logistic Regression</h3>
-<p>We used the significant variables from Random Forest decision tree for the logistic regression model. The sensitivity is 38.06% not as good as Random Forest model. But we can see duration, p outcome, contact category, month category (except February) are significant terms. Although the sensitivity of this model is low, we learned the following:</p>
+<p>We created dummy variables from Random Forest decision tree for the logistic regression model. The sensitivity is 38.06% not as good as Random Forest model. But we can see duration, p outcome, contact category, month category (except February) are significant terms. Although the sensitivity of this model is low, we learned the following:</p>
 <ul>
 <li>Previous marketing campaign success increases the chance of client subscribe a term deposit.</li>
 <li>Last contact during high increases the chance of client subscribe a term deposit while last contact during low decreases the chance of client subscribe a term deposit.</li>
 <li>Unknown contact category decreases the chance client subscribe a term deposit.</li>
-<li>The month of March, May, June, September, October, December increases the chance client subscribe a term deposit.</li>
+<li>The month of March, June, September, October, December increases the chance client subscribe a term deposit because they have positive estimates.</li>
 </ul>
 <p><a href="https://topepo.github.io/caret/train-models-by-tag.html#logistic-regression">Logistic Regression method in caret package</a></p>
 <pre class="r"><code># Logistic Regression
@@ -728,7 +728,7 @@ summary(bankFull_lg)</code></pre>
 </div>
 <div id="model-3-neural-network-cross-validation" class="section level3">
 <h3>Model 3: Neural Network cross validation</h3>
-<p>The black box Neural Network model produced best sensitivity rate 49.2%. We also used five-fold cross validation on training data set.</p>
+<p>The black box Neural Network model produced best sensitivity rate 49.2%. We also used two-fold cross validation on training data set.</p>
 <p><a href="https://topepo.github.io/caret/train-models-by-tag.html#neural-network">Neural Network in Caret package</a></p>
 <pre class="r"><code>bankFull_train &lt;- bankFull[ trainIndex,]
 bankFull_validate &lt;- bankFull[ -trainIndex,]
@@ -1118,10 +1118,11 @@ legend('bottomright', c(&quot;Decision Tree&quot;, &quot;Random Forest&quot;,&qu
 </tr>
 </tbody>
 </table>
+<br>
 <p>Logistic Regression model did not have the best sensitivity rate but it confirmed what factors leads to improve the client subscribe term deposit. The successful previous marketing campaigns lead to higher term deposit, higher contact duration leads to higher term deposit, unknown contact category lower term deposit, month of March, May, June, September, October, December increase term deposit. Based on these findings here are our recommendations to increase term deposit:</p>
 <ul>
 <li><em>Bank contacts clients using telephone or cellular more often and longer duration</em>.</li>
-<li><em>Bank does more successful marketing campaigns in month of March, May, June, September, October, December</em>.</li>
+<li><em>Bank does more successful marketing campaigns in month of March, June, September, October, December</em>.</li>
 </ul>
 <p>END</p>
 </div>
