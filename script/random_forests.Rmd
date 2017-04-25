@@ -257,7 +257,6 @@ k-fold cross validation is still problematic, however. Vanwinckelen and Blockeel
 
 `In addition to bias, the results of a k-fold cross-validation also have high variance. If we run two different tenfold cross-validations for the same learners on the same daa set S, but with different random partitioning of S into subsets S(i), these two cross-validations can give quite different results. An estimate with smaller variance can be obtained by repeating the cross-validation several times, with different partitionings, and taking the average of the results obtained during each cross-validation (page 2).`
 
-lj015625
 ```{r}
 fitControl <- trainControl(method="cv", number=10, repeats=5) #10-fold cross validation #repeated 5 times.
 
@@ -343,7 +342,7 @@ set.seed(123)
 trainIndex <- createDataPartition(BC$Class, p = .8,list = FALSE,times = 1)
 head(trainIndex)
 BC_train_caret <- BC[trainIndex,]
-BC_validate_caret <- BC[trainIndex,]
+BC_validate_caret <- BC[-trainIndex,]
 ```
 
 
