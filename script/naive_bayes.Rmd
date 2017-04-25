@@ -1,0 +1,447 @@
+---
+title: "Naive Bayes Classifiers"
+author: "San Cannon"
+date: "`r Sys.Date()`"
+output: html_document
+packages required: mlbench, caret, partykit, e1071, tm, wordcloud,randomForest, class
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Like other classifiers we have studied, Naive Bayes classifiers look to sort items into buckets.  These classifiers use probabilities to make decisions on how to classify items.  The basic idea is:
+Find out the probability of the previously unseen instance belonging to each class, then simply pick the most probable class.
+ 
+# Probability refresher
+* Prior probability: $P(A)$ - probability of event A occuring
+* Joint probability: $P(A \cap B)= P(A,B)$ - the probability of events A **and** B both occuring
+* Conditional probability: $P(A \mid B)$ - probability of event A occuring given that event B has occurred.  Not necessarily the same as $P(B \mid A)$ which is the probability that B occurs given that A has occured.
+* Relationship between prior, joint, and conditional: 
+$P(A,B) = P(B \mid A)P(A) = P(A \mid B)P(B)$
+* Independence: A is independent of B if $P(A \mid B) = P(A)$ 
+
+
+Use these relationships to get Bayes' rule:
+$$ P(A \mid B) = \frac{P(B \mid A) \, P(A)}{P(B)} $$
+
+where
+ * $P(A \mid B)$ = probability of instance B being in class A. This is what we are trying to compute
+* $P(B \mid A)$ = probability of generating instance B given class A. We can imagine that being in class A causes you to have feature B with some probability
+* $P(A)$ = probability of occurrence of class A. This is just how frequent the class A is in our data set
+* $P(B)$ = probability of instance B occurring.  This will be the same for all classes so you may not need to use it. 
+
+We are making follow up customer calls and we get to a customer called "Drew".  There is no salutation noted and the "Sex" field in the database is blank.  How do we address "Drew"?
+
+Well we know that we have two classes
+$c1$ = male, and $c2$ = female.
+
+Classifying "Drew" as male or female is
+equivalent to asking if it is more probable
+that "Drew" is male or female. That is:  which is
+greater $p(male | drew)$ or $p(female | drew)$
+Are we calling Drew Carey or Drew Barrymore?
+
+
+$$ P(Male \mid Drew) = \frac{P(Drew \mid Male) \, P(Male)}{P(Drew)} $$
+
+compared to:
+
+
+$$ P(Female \mid Drew) = \frac{P(Drew \mid Female) \, P(Female)}{P(Drew)} $$
+
+Say these are the clean entries in our data:
+
+| **Name**    | **Sex**    |
+|---------|--------|
+| Drew    | Male   |
+| Claudia | Female |
+| Drew    | Female |
+| Drew    | Female |
+| Alberto | Male   |
+| Karin   | Female |
+| Nina    | Female |
+| Sergio  | Male   |
+
+$p(male | drew) = \frac {1/3 * 3/8}{3/8} = \frac{0.125}{3/8}$
+
+$p(female | drew) = \frac {2/5 * 5/8}{3/8} = \frac{0.250}{3/8}$
+
+It is more likely that our customer is female so we should probably address "Drew" as "Ms." 
+
+What if we have more information?  How do we use more attributes to improve the percentages?
+
+What if our data looked like this?
+
+
+| **Name**    | **Over 5ft7in **| **Eyes**  |**Hair** | **Sex**    |
+|---------|-------------|-------|-------|--------|
+| Drew    | No          | Blue  | Short | Male   |
+| Claudia | Yes         | Brown | Long  | Female |
+| Drew    | No          | Blue  | Long  | Female |
+| Drew    | No          | Blue  | Long  | Female |
+| Alberto | Yes         | Brown | Short | Male   |
+| Karin   | No          | Blue  | Long  | Female |
+| Nina    | Yes         | Brown | Short | Female |
+| Sergio  | Yes         | Blue  | Long  | Male   |
+
+
+
+What are the conditional probabilities?
+
+| Sex    | Over 5f7in | P   |
+|--------|------|-----|
+| Male   | Yes  | 2/3 |
+| Male   | No   | 1/3 |
+| Female | Yes  | 2/5 |
+| Female | No   | 3/5 |
+
+| Sex    | Eyes | P   |
+|--------|------|-----|
+| Male   | Blue | 2/3 |
+| Male   | Brown | 1/3 |
+| Female | Blue | 2/5 |
+| Female | Brown| 3/5 |
+
+| Sex    | Hair | P   |
+|--------|------|-----|
+| Male   | Long | 1/3 |
+| Male   | Short| 2/3 |
+| Female | Long | 4/5 |
+| Female | Short| 1/5 |
+
+So our calculations are:
+
+$p(male | drew) = {2/3 * 2/3 * 1/3} = .148$
+
+$p(female | drew) = {2/5 *3/5 *4/5 } = .192$
+
+```{r drew_calc}
+library(e1071)
+
+#create dataframe - note that cust_data has 9 rows but sex only has 8.  The "unknown" Drew is the last row of the DF.  
+
+names <- c("Drew","Claudia","Drew","Drew","Alberto","Karin","Nina","Sergio","Drew")
+over57 <-c("No","Yes","No","No","Yes","No","Yes","Yes","Yes")
+eyes <- c("Blue","Brown","Blue", "Blue","Brown","Blue","Brown","Blue","Blue")
+hair <- c("Short","Long","Long","Long","Short","Long","Short","Long","Long")
+sex <- c("Male","Female","Female","Female","Male","Female","Female","Male")
+names<-as.factor(names)
+over57 <-as.factor(over57)
+eyes<- as.factor(eyes)
+hair<-as.factor(hair)
+sex<- as.factor(sex)
+cust_data <-data.frame(names,over57,eyes,hair)
+cust_data
+
+#create "test/train" split
+train <- cust_data[1:8,]
+test <- cust_data[9,]
+
+
+#train model
+drew_classifier <- naiveBayes(train,sex)
+drew_classifier
+
+# Our Drew is the last row - what's the verdict?
+predict(drew_classifier, test)
+
+```
+
+
+# Real life application of Naive Bayes classifiers: classifying spam
+
+
+```{r sms}
+# read the sms data into the sms data frame
+sms_raw <- read.csv("C:/Users/PhamX/Courses/Fall 2016/BIA 6301/Week 7/sms_spam.csv", stringsAsFactors = FALSE)
+
+# examine the structure of the sms data
+str(sms_raw)
+
+# convert spam/ham to factor.
+sms_raw$type <- factor(sms_raw$type)
+
+# examine the type variable more carefully
+str(sms_raw$type)
+table(sms_raw$type) #13% spam
+
+head(sms_raw)
+
+```
+Now we have a bunch of words and other stuff (emojis... ugh) that need to be cleaned up. This is a very simple example.  Text Mining (BIA 6304) goes into all the detail on how this works.
+
+```{r create_corpus}
+# build a corpus using the text mining (tm) package
+library(tm)
+sms_corpus <- Corpus(VectorSource(sms_raw$text))
+
+# examine the sms corpus
+print(sms_corpus)
+sms_corpus[[1]]$content
+
+# clean up the corpus using tm_map()
+# clean up the corpus using tm_map()
+corpus_clean <- tm_map(sms_corpus, tolower)
+DocumentTermMatrix(corpus_clean)
+corpus_clean <- tm_map(corpus_clean, removeNumbers)
+corpus_clean <- tm_map(corpus_clean, removeWords, stopwords())
+corpus_clean <- tm_map(corpus_clean, removePunctuation)
+corpus_clean <- tm_map(corpus_clean, stripWhitespace)
+
+
+# examine the clean corpus
+corpus_clean[[1]]$content
+
+
+```
+
+This is more useful but still isn't numbers.  For that we need to create a DocumentTermMatrix which outlines which Terms appear in which documents and presents it as a matrix.  We will then work with that and create our test and training sets. 
+
+```{r DTM}
+# create a document-term sparse matrix
+sms_dtm <- DocumentTermMatrix(corpus_clean)
+sms_dtm # 5559 documents with 7925 different terms
+# not every term is in every document - sparse matrix
+# here's a piece of the first entry
+inspect(sms_dtm[1,3050:3110])
+#note that there is a 1 for hope but zeros for everything else
+
+# creating training and test datasets
+sms_raw_train <- sms_raw[1:4169, ]
+sms_raw_test  <- sms_raw[4170:5559, ]
+
+sms_dtm_train <- sms_dtm[1:4169, ]
+sms_dtm_test  <- sms_dtm[4170:5559, ]
+
+sms_corpus_train <- corpus_clean[1:4169]
+sms_corpus_test  <- corpus_clean[4170:5559]
+
+# check that the proportion of spam is similar
+prop.table(table(sms_raw_train$type))
+prop.table(table(sms_raw_test$type))
+
+
+```
+Fun aside: WORDCLOUDS!
+
+```{r}
+# word cloud visualization
+library(wordcloud)
+
+wordcloud(sms_corpus_train, min.freq = 30, random.order = FALSE)
+
+# subset the training data into spam and ham groups
+spam <- subset(sms_raw_train, type == "spam")
+ham  <- subset(sms_raw_train, type == "ham")
+
+wordcloud(spam$text, max.words = 40, scale = c(3, 0.5))
+wordcloud(ham$text, max.words = 40, scale = c(3, 0.5))
+
+
+```
+
+More useful is to actually use the numbers that underly the wordclouds.  Let's look at frequency counts:
+
+```{r freq}
+# indicator features for frequent words
+sms_dict <- findFreqTerms(sms_dtm_train, 5)
+sms_train <- DocumentTermMatrix(sms_corpus_train, list(dictionary = sms_dict))
+sms_test  <- DocumentTermMatrix(sms_corpus_test, list(dictionary = sms_dict))
+
+# convert counts to a factor
+convert_counts <- function(x) {
+  x <- ifelse(x > 0, 1, 0)
+  x <- factor(x, levels = c(0, 1), labels = c("No", "Yes"))
+}
+
+# apply() convert_counts() to columns of train/test data
+sms_train <- apply(sms_train, MARGIN = 2, convert_counts)
+sms_test  <- apply(sms_test, MARGIN = 2, convert_counts)
+
+
+```
+
+Time to train a model:
+
+```{r train}
+## Step 3: Training a model on the data ----
+sms_classifier <- naiveBayes(sms_train, sms_raw_train$type)
+sms_classifier$tables[1:10]
+
+
+```
+
+
+So, how did the model do?
+
+```{r meval}
+## Step 4: Evaluating model performance ----
+library(caret)
+sms_test_pred <- predict(sms_classifier, sms_test)
+
+
+confusionMatrix(sms_test_pred, sms_raw_test$type)
+
+
+```
+
+Can we make it better? Try using the Laplace option
+
+```{r improve}
+## Step 5: Improving model performance ----
+sms_classifier2 <- naiveBayes(sms_train, sms_raw_train$type, laplace = 1)
+sms_test_pred2 <- predict(sms_classifier2, sms_test)
+confusionMatrix(sms_test_pred2, sms_raw_test$type)
+
+```
+
+Slight improvement in accuracy
+
+
+#Another take at predicting breast cancer
+
+
+```{r bring in data}
+library(mlbench) #has the Breast Cancer dataset in it
+
+data(BreastCancer) 
+str(BreastCancer)
+#need to drop missing values cuz knn doesn't like them
+clean <- BreastCancer[complete.cases(BreastCancer),]
+#drop irrelevant variables
+dropvars <- names(clean) %in% c("Id") 
+clean <- clean[!dropvars]
+
+```
+
+Let's split the data into our test and training datasets.
+
+```{r test_train, echo=FALSE}
+set.seed(199)
+trainIndex <- createDataPartition(clean$Class, p = .70,list = FALSE,times = 1)
+train.cancer  <- clean[trainIndex,]
+test.cancer  <- clean[-trainIndex,]
+```
+Now  try the NB classifier on these data - include Laplace transformation to see if it helps. 
+
+```{r}
+cancer.bayes <- naiveBayes(Class ~ ., data = train.cancer)
+nb_predicted <- predict(cancer.bayes, test.cancer)
+nb_prob <- round(predict(cancer.bayes, test.cancer, type="raw"), digits = 2)
+nb.CM <-confusionMatrix(nb_predicted, test.cancer$Class, positive = "malignant")
+nb.CM
+
+cancer.bayes2 <- naiveBayes(Class ~ ., data = train.cancer, laplace = 1)
+nb2_predicted <- predict(cancer.bayes2, test.cancer)
+nb2_prob <- round(predict(cancer.bayes2, test.cancer, type="raw"), digits = 2)
+nb2.CM <-confusionMatrix(nb2_predicted, test.cancer$Class, positive = "malignant")
+nb2.CM
+```
+Didn't help here.
+
+
+DT - how about a new package for decision trees?
+
+```{r DT}
+library(partykit)
+cancer.dt <- ctree(Class ~ ., data = train.cancer)
+plot(cancer.dt)
+dt_predicted <- predict(cancer.dt, test.cancer)
+dt.CM <-confusionMatrix(dt_predicted, test.cancer$Class, positive = "malignant")
+dt.CM
+```
+
+Remember our ensemble methods from last week?
+
+```{r RF}
+library(randomForest)
+set.seed(123) 
+
+cancer.rf <- randomForest(Class ~.,data=train.cancer, mtry=3, ntree=600,na.action = na.omit, importance=TRUE) #default mtry = 3 and ntree= 500.
+print(cancer.rf) #shows OOB of model and confusion matrix
+
+actual <- test.cancer$Class #this is just a repeat of the above
+rf_predicted<-predict(cancer.rf, test.cancer, type="response") 
+rf.CM <- confusionMatrix(rf_predicted, actual,positive="malignant") #the model vs the actual holdout data.
+print(rf.CM)
+```
+
+
+Let's see how other models do.  How about Knn?
+
+
+```{r knn_estimation}
+library(class)
+train_label <- train.cancer$Class
+test_label <- test.cancer$Class
+#now remove Class from matrix
+dropvars <- names(train.cancer) %in% c("Class") 
+train.cancer <- train.cancer[!dropvars]
+test.cancer <- test.cancer[!dropvars]
+
+cancer.knn3 <- knn(train = train.cancer, test = test.cancer, cl = train_label, k = 3, prob = TRUE)
+cancer.knn7 <- knn(train = train.cancer, test = test.cancer, cl = train_label, k = 7, prob = TRUE)
+knn3.CM <- confusionMatrix(test_label, cancer.knn3, positive = "malignant")
+knn7.CM <- confusionMatrix(test_label, cancer.knn7, positive = "malignant")
+
+```
+
+
+Compare performance
+
+```{r performance}
+knn3.CM$overall[1]
+knn7.CM$overall[1]
+nb.CM$overall[1]
+dt.CM$overall[1]
+rf.CM$overall[1]
+
+
+```
+
+#looks like knn7 and nb have similar accuracy and rf is a tad higher. 
+
+`Kappa = Pr(a) - Pr(e) / 1 - Pr(e)`
+
+Where, 
+
+Pr(a): proportion of actual agreement between the classifier and the true values  
+
+Pr(e): proportion of expected agreement between the classifier and the true values
+
+Kappa "adjusts accuracy by accounting for the possibility of a correct prediction by chance alone. Kappa values range to a maximum number of 1, which indicates perfect agreement between the model's predictions and the true values--a rare occurrence. Values less than one indicate imperfect agreement" (Lantz 2013, p. 303)
+
+```{r}
+knn3.CM$overall[2]
+knn7.CM$overall[2]
+nb.CM$overall[2]
+dt.CM$overall[2]
+rf.CM$overall[2]
+```
+
+Kappa says knn3 or rf. 
+Kappa statistics don't tell quite the same story
+
+We've talked about cases where accuracy might not be the "best" measure to judge by.  What about sensitivity (correctly identified the true positives) and specificity (correctly identified the true negatives)?
+
+```{r specificity/sensitivity}
+# Is one "better" than the other?
+knn3.CM$byClass[1]
+knn7.CM$byClass[1]
+nb.CM$byClass[1]
+dt.CM$byClass[1]
+rf.CM$byClass[1]
+
+knn3.CM$byClass[2]
+knn7.CM$byClass[2]
+nb.CM$byClass[2]
+dt.CM$byClass[2]
+rf.CM$byClass[2]
+
+```
+
+NB and RF have highest sensitivity. Knn3 has highest specificity.  
+
+Does one of these help you decide?  Why? Remember how we have defined our "positive" class....
+

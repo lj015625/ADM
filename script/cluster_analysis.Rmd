@@ -1,7 +1,7 @@
 ---
 title: "Week 3"
 author: "Xuan Pham"
-date: "'r Sys.Date()'"
+date: "`r Sys.Date()`"
 output: html_document
 ---
 
@@ -32,7 +32,7 @@ We will use the Teen Market Segmentation dataset from Chapter 9 in the Lantz tex
 # Getting Started
 
 ```{r}
-setwd("C:/Users/lj015625/Desktop/DataMining Class/Applied_Data_Mining/data")
+setwd("C:/Users/PhamX/Courses/Spring_2017/BIA_6301/Module_3/data")
 
 teens<-read.csv("snsdata.csv", header=TRUE, sep=",")
 
@@ -147,8 +147,7 @@ table(teens$no_gender, useNA = "ifany") #We have 2,724 cases of unknown gender. 
 We want to cluster what these 30,000 teenagers talked about on their SNS profiles with regards to the five categories of interests: extracurricular activities, fashion, religion, romance, and antisocial behavior. 
 
 ```{r}
-interests <- teens[5:40] #Take the 5th through the 40th variables into the model.(interests)
-summary(interests)
+interests <- teens[5:40] #Take the 5th through the 40th variables into the model.
 ```
 
 # Let's Talk Cluster Analysis
@@ -336,7 +335,7 @@ plot(1:10, wss, type="b", xlab="Number of Clusters",
 
 
 #### Method 4: Using pseudo-F statistic
-the 
+
 You should read the ../doc/indexG1_details.pdf from the help file for **index.G1**.
 
 Look for a relative large psuedo F-statistic.
@@ -386,6 +385,14 @@ Clusters_5[order(-Clusters_5$X4), ]
 Clusters_5[order(-Clusters_5$X5), ]
 ```
 
+### A note on the centroid values
+
+Each centroid is the average value for a given characteristic in that cluster.
+
+So for cluster 1, the top centroid value is music (2.43). The average number of times that the the word "music" was used in cluster 1 is 2.43 times. 
+
+# Cluster profile
+
 **Cluster 1** (4,216 teens): music, band. Other words with smaller centroids: rock, god, dance, hair, shopping, cute, football, church.
 
 Are these the "band kids"?
@@ -404,9 +411,7 @@ Who are these "kids"? The "basket cases"?
 Are these "princesses"?
 
 
-**Cluster 5** (4,500 teens): Moderate centroid values: hair, shopping, cute, soccer, basketball, mall, music, church, football, softball
-
-Who are these "kids"? Another "basket cases"?
+**Cluster 5** (4,500 teens): Moderate centroid values: hair, shopping, cute, soccer, basketball, mall, music, church, football, softball. Who are these "kids"? Another "basket cases"?
 
 
 Let's add back the demographic information.
@@ -423,6 +428,11 @@ aggregate(data = teens, female ~ cluster, mean)
 
 # mean number of friends by cluster
 aggregate(data = teens, friends ~ cluster, mean)
+
+# checking now to see how the centroids are calculated
+aggregate(teens$music~teens$cluster, FUN="sum")
+teen_clusters_5$size
+band_cluster1_centroid=10247/4216
 
 ```
 
@@ -459,19 +469,16 @@ Maybe we see three "major" periods of prices? Shall we try k=3 for k-medoids?
 
 Dissimilarity matrix contains the dissimilarity between the data points. Dissimilarity is also referred to as "distance." The default distance measure for function dist() in R is Euclidean. The function dist() is used to create the dissimilarity matrix.
 
-Size of the matrix is calculated as follows (n k) combation:
-
-n!/(2! * (n-2)!) = (n*n-1)/2
+Size of the matrix is calculated as follows:
 
 n*(n-1)/2 = 37*(37-1)/2 = 666 elements.
-
 
 ```{r}
 library(cluster)
 
 dissimilarity.matrix <- dist(as.matrix(oil_price_df, method="euclidean"))
 #dissimilarity.matrix
-oil_pam <- pam(dissimilarity.matrix,3)
+oil_pam <- pam(dissimilarity.matrix,4)
 summary(oil_pam) #Look at the assigned cluster for each data value and it nearest neighboring cluster
 plot(oil_pam) #Silhouette Plot
 ```
@@ -499,7 +506,6 @@ plot(oil_price_hierarchical, main = "Dendrogam of Crude Oil Prices") #How many c
 ```
 
 The default rule of thumb is to prune the tree by the largest difference between two steps (i.e. nodes). 
-
 
 ```{r}
 height <- oil_price_hierarchical$height #This gives us the height of each node in the dendrogram.
