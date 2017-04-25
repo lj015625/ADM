@@ -234,13 +234,13 @@ getResult(bankFull_boost, "raw", bankFull_validate)
 
 ###Model 2: Logistic Regression
 
-We used the significant variables from Random Forest decision tree for the logistic regression model.
+We created dummy variables from Random Forest decision tree for the logistic regression model.
 The sensitivity is 38.06% not as good as Random Forest model.  But we can see duration, p outcome, contact category, month category (except February) are significant terms. Although the sensitivity of this model is low, we learned the following:
 
 - Previous marketing campaign success increases the chance of client subscribe a term deposit.
 - Last contact during high increases the chance of client subscribe a term deposit while last contact during low decreases the chance of client subscribe a term deposit.
 - Unknown contact category decreases the chance client subscribe a term deposit.
-- The month of March, May, June, September, October, December increases the chance client subscribe a term deposit.
+- The month of March, June, September, October, December increases the chance client subscribe a term deposit because they have postive estimates.
 
 
 [Logistic Regression method in caret package](https://topepo.github.io/caret/train-models-by-tag.html#logistic-regression)
@@ -274,7 +274,7 @@ getResult(bankFull_lg, "raw", bankFull_logit_validate)
 
 ###Model 3: Neural Network cross validation
 
-The black box Neural Network model produced best sensitivity rate 49.2%.  We also used five-fold cross validation on training data set.
+The black box Neural Network model produced best sensitivity rate 49.2%.  We also used two-fold cross validation on training data set.
 
 [Neural Network in Caret package](https://topepo.github.io/caret/train-models-by-tag.html#neural-network)
 
@@ -357,7 +357,7 @@ We used variety of ensemble methods (Random Forest, Boosting, Bagging) for decis
 Logistic Regression model did not have the best sensitivity rate but it confirmed what factors leads to improve the client subscribe term deposit.  The successful previous marketing campaigns lead to higher term deposit, higher contact duration leads to higher term deposit, unknown contact category lower term deposit, month of March, May, June, September, October, December increase term deposit.  Based on these findings here are our recommendations to increase term deposit:
 
 - *Bank contacts clients using telephone or cellular more often and longer duration*.
-- *Bank does more successful marketing campaigns in month of March, May, June, September, October, December*.  
+- *Bank does more successful marketing campaigns in month of March, June, September, October, December*.  
 
 
 
