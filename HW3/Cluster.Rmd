@@ -1,0 +1,504 @@
+---
+title: "BIA 6301 APPLIED DATA MINING HOMEWORK ASSIGNMENT 3"
+author: "Leonardo Ji"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+```
+
+
+###Part A. Customer Segmentation at a Bakery
+The purpose of this assignment is to show how k-means is used in customer segmentation analysis. 
+
+You are a newly minted data scientist who have decided to start a statistical consulting business. Your neighbor happens to be the owner of a local bakery called Cookie & Icing, and she has asked you to help her identify "customer base and additional sales opportunities." The neighbor provides you with a data set named bakery-binary.csv, which contains 1,000 customer transactions and 51 attributes. Each transaction corresponds to item purchases made by the customer during a visit to Cookie & Icing. The items are 50 different cakes, pastries, coffee products, and beverages. A "1" in a transaction indicates the purchase of the corresponding item, and a 0 indicates no purchase for the item. An additional attribute named "Weekend" indicates whether the transaction took place on a weekend. 
+
+	You decided to perform k-means cluster analysis on the provided data set and identified the following "k" (or clusters) to try out: 4, 5, 6, 7, and 8.
+	
+1.	How many customer segments are prevalent in the provided data set after you have conducted the analysis? Justify your answer. Describe the characteristics of each customer segment. (Hint: You should generate aggregate profiles for the clusters and then sort the centroid values along with the item names in descending order. You may also want to filter out the items with very low centroid values. These tasks will make it easier to identify the characteristics of the customer segments.)
+2.	Is there a particular customer segment that primarily made purchases during the weekend? If yes, what were the popular items with the weekend customers? 
+3.	Can you identify four to six potential opportunities for Cookie & Icing to increase sales of one or more of the products through cross-sell recommendations and/or other types of customer incentives? Justify your answer. 
+
+
+
+###Data
+1000 rows of bineary Bakery customers' purchase items data.
+
+```{r}
+setwd("C:/Users/lj015625/Desktop/DataMining Class/HW3/data")
+bakery<-read.csv("bakery-binary.csv",header=TRUE, sep=",")
+dim(bakery)
+names(bakery)
+str(bakery)
+summary(bakery)
+```
+
+```{r}
+set.seed(123)
+bakery_clusters_4 <- kmeans(bakery, centers=4) 
+# outputs from kmeans
+names(bakery_clusters_4) 
+# Size: Number of bakery items in each cluster.
+bakery_clusters_4$size
+#Let's show the coordinates of the cluster centroids for the interest variables
+#bakery_clusters_4$centers 
+#t(bakery_clusters_4$centers)
+```
+```{r}
+set.seed(123)
+bakery_clusters_5 <- kmeans(bakery, centers=5) 
+bakery_clusters_5$size
+#bakery_clusters_5$centers 
+#t(bakery_clusters_5$centers)
+```
+
+
+```{r}
+set.seed(123)
+bakery_clusters_6 <- kmeans(bakery, centers=6) 
+bakery_clusters_6$size
+#bakery_clusters_6$centers 
+#t(bakery_clusters_6$centers)
+```
+
+```{r}
+set.seed(123)
+bakery_clusters_7 <- kmeans(bakery, centers=7) 
+bakery_clusters_7$size
+#bakery_clusters_7$centers 
+#t(bakery_clusters_7$centers)
+```
+
+```{r}
+set.seed(123)
+bakery_clusters_8 <- kmeans(bakery, centers=8) 
+bakery_clusters_8$size
+#bakery_clusters_8$centers 
+#t(bakery_clusters_8$centers)
+```
+
+
+#### Method 1: Use the visualizations 
+```{r}
+library(fpc) 
+plotcluster(bakery, bakery_clusters_4$cluster, main="k = 4")
+plotcluster(bakery, bakery_clusters_5$cluster, main="k = 5")
+plotcluster(bakery, bakery_clusters_6$cluster, main="k = 6")
+plotcluster(bakery, bakery_clusters_7$cluster, main="k = 7")
+plotcluster(bakery, bakery_clusters_8$cluster, main="k = 8")
+```
+#### Method 2: Examine the betweenss and withinss ratios.
+```{r}
+# Within Sum of Squares
+bakery_clusters_4$withinss
+# Between Sum of Squares
+bakery_clusters_4$betweenss
+# Total Sum of Squares
+bakery_clusters_4$totss
+```
+```{r}
+bakery_clusters_5$withinss
+bakery_clusters_5$betweenss
+bakery_clusters_5$totss
+```
+```{r}
+bakery_clusters_6$withinss
+bakery_clusters_6$betweenss
+bakery_clusters_6$totss
+```
+
+```{r}
+bakery_clusters_7$withinss
+bakery_clusters_7$betweenss
+bakery_clusters_7$totss
+```
+
+```{r}
+bakery_clusters_8$withinss
+bakery_clusters_8$betweenss
+bakery_clusters_8$totss
+```
+
+Separation is determined by between sum of square / total sum of square  
+k = 8 has the highest between sum of square which means most separation.
+```{r}
+clusters4<- bakery_clusters_4$betweenss/bakery_clusters_4$totss
+clusters5<- bakery_clusters_5$betweenss/bakery_clusters_5$totss
+clusters6<- bakery_clusters_6$betweenss/bakery_clusters_6$totss
+clusters7<- bakery_clusters_7$betweenss/bakery_clusters_7$totss
+clusters8<- bakery_clusters_8$betweenss/bakery_clusters_8$totss
+
+betweenss.metric <- c(clusters4, clusters5, clusters6, clusters7, clusters8)
+print(betweenss.metric) # Look for a ratio that is closer to 1.
+```
+
+Cluster Cohesion within sum of square / total sum of square ratio 
+k = 8 has the lowest within sum of square which means most cohesion.
+```{r}
+clusters4<- bakery_clusters_4$tot.withinss/bakery_clusters_5$totss
+clusters5<- bakery_clusters_5$tot.withinss/bakery_clusters_5$totss
+clusters6<- bakery_clusters_6$tot.withinss/bakery_clusters_6$totss
+clusters7<- bakery_clusters_7$tot.withinss/bakery_clusters_7$totss
+clusters8<- bakery_clusters_8$tot.withinss/bakery_clusters_8$totss
+
+totwithinss.metric <- c(clusters4, clusters5, clusters6, clusters7, clusters8)
+print(totwithinss.metric) #Looking for a ratio that is closer to 0. 
+```
+
+
+#### Method 3: Using the "Elbow Method"
+##### Within Sum of Squares
+elbow point at K = 5, 7
+```{r}
+# for one cluster the withiness is equals to 3483 (sum of variance on all items).
+wss <- NULL
+wss[1] <- (nrow(bakery)-1)*sum(apply(bakery, 2, var))
+# test within ss from 2 to 8 clusters.
+# elbow point at K = 5, 7
+set.seed(123)
+for (i in 1:9)
+  wss[i] <- sum(kmeans(bakery, centers=i)$withinss)
+
+plot(1:9, wss, type="b", xlab="Number of Clusters", ylab="Within Sum of Squares", 
+     main = "Number of Clusters (k) versus Cluster Cohesiveness")
+```
+##### Between sum of square 
+elbow point at K= 4, 6
+```{r}
+bss <- NULL
+bss[1] <- (nrow(bakery)-1)*sum(apply(bakery, 2, var))
+set.seed(123)
+for (i in 1:9) 
+  bss[i] <- sum(kmeans(bakery, centers=i)$betweenss)
+plot(1:9, bss, type="b", xlab="Number of Clusters",
+     ylab="Between Group Sum of Squares", main = "Number of Clusters (k) versus Cluster Distinctiveness")
+```
+
+#### Method 4: Using pseudo-F statistic
+K = 7 has largest pseudo F-statistic
+```{r}
+library(clusterSim)
+#help(index.G1) #read the ../doc/indexG1_details.pdf
+
+a<-index.G1(bakery, bakery_clusters_4$cluster, centrotypes = "centroids") 
+b<-index.G1(bakery, bakery_clusters_5$cluster, centrotypes = "centroids") 
+c<-index.G1(bakery, bakery_clusters_6$cluster, centrotypes = "centroids")
+d<-index.G1(bakery, bakery_clusters_7$cluster, centrotypes = "centroids")
+e<-index.G1(bakery, bakery_clusters_8$cluster, centrotypes = "centroids")
+
+pseudoF<-c(a,b,c,d,e)
+pseudoF
+```
+FPC library suggest K = 4
+kmeansruns also use pseudo-F statistic
+```{r}
+library(fpc) 
+bakery_clusters_optimal<-kmeansruns(bakery, krange=4:8) #finds the "best"" K between 4 and 8
+bakery_clusters_optimal$bestk
+```
+
+### Creating an Aggregate Profile for Our Clusters
+```{r}
+bakery_clusters_7$size #Get the size of each cluster
+
+Clusters_7<-data.frame(t(bakery_clusters_7$centers)) #Transpose for easier reading
+Clusters_7
+```
+### We can sort the centroids for each cluster.
+```{r}
+Clusters_7[order(-Clusters_7$X1), ] 
+Clusters_7[order(-Clusters_7$X2), ]
+Clusters_7[order(-Clusters_7$X3), ]
+Clusters_7[order(-Clusters_7$X4), ]
+Clusters_7[order(-Clusters_7$X5), ]
+Clusters_7[order(-Clusters_7$X6), ]
+Clusters_7[order(-Clusters_7$X7), ]
+```
+- **Segment 1 (88)**: High centroid value on Strawberry.Cake, Napoleon.Cake.
+- **Segment 2 (76)**: High centroid value on Lemon.Cake, Lemon.Tart. 
+- **Segment 3 (87)**: High centroid value on Orange.Juice, Cheese.Croissant.
+- **Segment 4 (49)**: High centroid value on Cherry.Tart, Apricot.Danish, Opera.Cake.
+- **Segment 5 (424)**: All very low centroid values. General basket.
+- **Segment 6 (247)**: Weekend 100%.  All very low centroid values on all items
+- **Segment 7 (29)**: High centroid value on Raspberry.Cookie, Lemon.Cookie, Raspberry.Lemonade, Lemon.Lemonade, Green.Tea.
+
+
+### We can see item purchased on weekend have low centroid values on all items. What if we only use weekend data.
+
+```{r}
+bakery_weekend <- bakery[which(bakery$Weekend==1),]
+dim(bakery_weekend)
+summary(bakery_weekend)
+# percent of each items
+bakery_weekend_sum <- as.data.frame(apply(bakery_weekend,2,mean))
+bakery_weekend_sum
+```
+
+```{r}
+# 4 clusters
+set.seed(123)
+bakery_weekend_clusters_4 <- kmeans(bakery_weekend, centers=4) 
+#t(bakery_weekend_clusters_4$centers)
+bakery_weekend_clusters_4$size #Get the size of each cluster
+
+# 5 clusters
+set.seed(123)
+bakery_weekend_clusters_5 <- kmeans(bakery_weekend, centers=5) 
+#t(bakery_weekend_clusters_5$centers)
+bakery_weekend_clusters_5$size #Get the size of each cluster
+
+# 6 clusters
+set.seed(123)
+bakery_weekend_clusters_6 <- kmeans(bakery_weekend, centers=6) 
+bakery_weekend_clusters_6$size
+#t(bakery_weekend_clusters_6$centers)
+bakery_weekend_clusters_6$size #Get the size of each cluster
+
+# 7 clusters
+set.seed(123)
+bakery_weekend_clusters_7 <- kmeans(bakery_weekend, centers=7) 
+#t(bakery_weekend_clusters_7$centers)
+bakery_weekend_clusters_7$size #Get the size of each cluster
+
+# 8 clusters
+set.seed(123)
+bakery_weekend_clusters_8 <- kmeans(bakery_weekend, centers=8) 
+#t(bakery_weekend_clusters_8$centers)
+bakery_weekend_clusters_8$size #Get the size of each cluster
+```
+```{r}
+# Separation is determined by between sum of square / total sum of square  
+# k = 4 has the highest between sum of square which means most separation.
+clusters4<- bakery_weekend_clusters_4$betweenss/bakery_weekend_clusters_4$totss
+clusters5<- bakery_weekend_clusters_5$betweenss/bakery_weekend_clusters_5$totss
+clusters6<- bakery_weekend_clusters_6$betweenss/bakery_weekend_clusters_6$totss
+clusters7<- bakery_weekend_clusters_7$betweenss/bakery_weekend_clusters_7$totss
+clusters8<- bakery_weekend_clusters_8$betweenss/bakery_weekend_clusters_8$totss
+
+betweenss.metric <- c(clusters4, clusters5, clusters6, clusters7, clusters8)
+print(betweenss.metric) # Look for a ratio that is closer to 1.
+
+# Cluster Cohesion within sum of square / total sum of square ratio 
+# k = 8 has the lowest within sum of square which means most cohesion.
+clusters4<- bakery_weekend_clusters_4$tot.withinss/bakery_weekend_clusters_5$totss
+clusters5<- bakery_weekend_clusters_5$tot.withinss/bakery_weekend_clusters_5$totss
+clusters6<- bakery_weekend_clusters_6$tot.withinss/bakery_weekend_clusters_6$totss
+clusters7<- bakery_weekend_clusters_7$tot.withinss/bakery_weekend_clusters_7$totss
+clusters8<- bakery_weekend_clusters_8$tot.withinss/bakery_weekend_clusters_8$totss
+
+totwithinss.metric <- c(clusters4, clusters5, clusters6, clusters7, clusters8)
+print(totwithinss.metric) #Looking for a ratio that is closer to 0. 
+```
+
+```{r}
+#### Method 3: Using the "Elbow Method"
+# for one cluster the withiness is equals to 3483 (sum of variance on all items).
+wss <- NULL
+wss[1] <- (nrow(bakery_weekend)-1)*sum(apply(bakery_weekend, 2, var))
+# test within ss from 2 to 8 clusters.
+# elbow point at K = 5, 7
+set.seed(123)
+for (i in 1:9)
+  wss[i] <- sum(kmeans(bakery_weekend, centers=i)$withinss)
+
+plot(1:9, wss, type="b", xlab="Number of Clusters", ylab="Within Sum of Squares", 
+     main = "Number of Clusters (k) versus Cluster Cohesiveness")
+
+#Between sum of square  
+# elbow point at K= 4, 6
+bss <- NULL
+bss[1] <- (nrow(bakery_weekend)-1)*sum(apply(bakery_weekend, 2, var))
+set.seed(123)
+for (i in 1:9) 
+  bss[i] <- sum(kmeans(bakery_weekend, centers=i)$betweenss)
+plot(1:9, bss, type="b", xlab="Number of Clusters",
+     ylab="Between Group Sum of Squares", main = "Number of Clusters (k) versus Cluster Distinctiveness")
+
+```
+
+
+Pick K = 8 on bakery_weekend
+```{r}
+#### Using pseudo-F statistic
+# K = 8 has high pseudo F-statistic
+library(clusterSim)
+help(index.G1) #read the ../doc/indexG1_details.pdf
+a<-index.G1(bakery_weekend, bakery_weekend_clusters_4$cluster, centrotypes = "centroids") 
+b<-index.G1(bakery_weekend, bakery_weekend_clusters_5$cluster, centrotypes = "centroids") 
+c<-index.G1(bakery_weekend, bakery_weekend_clusters_6$cluster, centrotypes = "centroids")
+d<-index.G1(bakery_weekend, bakery_weekend_clusters_7$cluster, centrotypes = "centroids")
+e<-index.G1(bakery_weekend, bakery_weekend_clusters_8$cluster, centrotypes = "centroids")
+pseudoF<-c(a,b,c,d,e)
+pseudoF
+
+library(fpc) 
+bakery_weekend_clusters_optimal<-kmeansruns(bakery_weekend, krange=4:8) #finds the "best"" K between 4 and 8
+bakery_weekend_clusters_optimal$bestk
+
+```
+
+```{r}
+Clusters_8<-data.frame(t(bakery_weekend_clusters_8$centers)) #Transpose for easier reading
+
+bakery_weekend_clusters_8$size
+
+Clusters_8[order(-Clusters_8$X1), ] 
+Clusters_8[order(-Clusters_8$X2), ]
+Clusters_8[order(-Clusters_8$X3), ]
+Clusters_8[order(-Clusters_8$X4), ]
+Clusters_8[order(-Clusters_8$X5), ] 
+Clusters_8[order(-Clusters_8$X6), ]
+Clusters_8[order(-Clusters_8$X7), ]
+Clusters_8[order(-Clusters_8$X8), ]
+```
+- **Segment 1 (17)**: Moderate high centroid value on Apple Tart, Apple Croissant, Apple Danish.  
+- **Segment 2 (169)**: All very low centroid values. General basket.
+- **Segment 3 (18)**: High centrid value on Apple Pie, Coffee Eclair, Hot Coffee, Almond Twist.
+- **Segment 4 (11)**: High centroid value on Cherry Tart.
+- **Segment 5 (43)**: Moderate high centroid value on Blackberry Tart.
+- **Segment 6 (24)**: High centroid value on Vanilla Frappuccino, Chocolate Tart.
+- **Segment 7 (18)**: High centroid value on Cherry Tart, Apricot Danish, Opera Cake. These items also show up on previous clustering.
+- **Segment 8 (15)**: High centroid value on Chocolate Eclair.
+
+
+
+###Part B. Other Cluster Methods
+1.	Hierarchical cluster analysis is yet another alternative to k-means and k-medoids. Download and run the gapminder_Americas.R file from Blackboard. Interpret the dendrogram. Rerun the analysis using all other available distance methods (single, complete, etc.). Use the results to answer these questions:
+a.	Briefly describe the difference(s) among the alternative distance methods. 
+b.	Which distance method works best for the Americas data set? How many clusters can you identify from the analysis? Justify your answer. 
+
+2.	K-means cluster analysis is sensitive to outliers. An alternative method is k-medoids, which we discussed in class. Use the pam() function in the R package named cluster to perform k-medoids on the Americas data set. Plot your clusters using the plot() function and interpret the silhouette plot. Compare the results between k-medoids and hierarchical cluster analysis.  
+
+####Data
+```{r}
+#You will need to install gapminder and tidyverse packages. 
+
+library(gapminder)
+library(tidyverse)
+#If you cannot install tidyverse, try installing dplyr package instead.
+
+#Getting the data 
+#dplyr package, which is included in tidyverse, allows for filter/select/rename 
+# %>% is called a "pipe." Go ahead...google "pipe" and "piping" in R & dplyr.
+gapminder_Americas<- gapminder %>% filter(continent=="Americas", year==2007) %>% select(country,lifeExp, gdpPercap) 
+
+gapminder_Americas<-as.data.frame(gapminder_Americas)
+#replacing row names
+names(gapminder_Americas)
+Americas<-gapminder_Americas[,-1]
+names(Americas);
+dim(Americas)
+# put gapminder_Americas$county for row names
+rownames(Americas)<-gapminder_Americas$country
+head(Americas)
+tail(Americas)
+ggplot(Americas, aes(x = gdpPercap, y = lifeExp)) +
+  geom_point(color = "blue", shape=1, size = 1) + theme_bw() + 
+  xlab("GDP Per Capita") + ylab("Life Expetancy") +
+  ggtitle("GDP Per Capita vs Life Expectancy") 
+```
+
+```{r}
+library(fastcluster) #makes hclust() runs faster
+Americas_hclust <- hclust(dist(Americas), method="ward.D") 
+
+#Looks up the hclust help file
+# ?stats::hclust
+#Dendrogram
+plot(Americas_hclust, hang = -1) 
+# draw dendogram with red borders around 2 clusters 
+# try 3 clusters to see the difference
+rect.hclust(Americas_hclust, k=3, border="red")
+#rect.hclust(Americas_hclust, k=4, border="red")
+#rect.hclust(Americas_hclust, k=5, border="red")
+#rect.hclust(Americas_hclust, k=6, border="red")
+```
+#### Different distance methods:
+ Ward's minimum variance method aims at finding compact, spherical clusters. 
+ option "ward.D2" implements that criterion (Murtagh and Legendre 2014). With the latter, the dissimilarities are squared before cluster updating. 
+ The complete linkage method finds similar clusters. 
+ The single linkage method (which is closely related to the minimal spanning tree) adopts a 'friends of friends' clustering strategy. 
+ The other methods can be regarded as aiming for clusters with characteristics somewhere between the single and complete link methods.
+```{r}
+Americas_hclust <- hclust(dist(Americas), method="complete") 
+plot(Americas_hclust, hang = -1) 
+rect.hclust(Americas_hclust, k=3, border="red")
+```
+
+```{r}
+Americas_hclust <- hclust(dist(Americas), method="single")
+plot(Americas_hclust, hang = -1) 
+rect.hclust(Americas_hclust, k=3, border="red")
+```
+
+```{r}
+Americas_hclust <- hclust(dist(Americas), method="average") 
+plot(Americas_hclust, hang = -1) 
+rect.hclust(Americas_hclust, k=3, border="red")
+```
+
+```{r}
+Americas_hclust <- hclust(dist(Americas), method="mcquitty")
+plot(Americas_hclust, hang = -1) 
+rect.hclust(Americas_hclust, k=3, border="red")
+```
+
+```{r}
+Americas_hclust <- hclust(dist(Americas), method="median")
+plot(Americas_hclust, hang = -1) 
+rect.hclust(Americas_hclust, k=3, border="red")
+```
+
+```{r}
+Americas_hclust <- hclust(dist(Americas), method="centroid")
+plot(Americas_hclust, hang = -1) 
+rect.hclust(Americas_hclust, k=3, border="red")
+```
+
+```{r}
+Americas_hclust <- hclust(dist(Americas), method="ward.D2")
+plot(Americas_hclust, hang = -1) 
+rect.hclust(Americas_hclust, k=3, border="red")
+```
+####The default rule of thumb is to prune the tree by the largest difference between two steps (i.e. nodes).
+
+```{r}
+#This gives us the height of each node in the dendrogram.
+height <- Americas_hclust$height 
+height
+#This creates a vector with a 0 for the mininum height (bottom of tree) and without the highest height (1 cluster; top of tree)
+# add first 0 and remove last item
+height.2 <- c(0,height[-length(height)]) 
+height.2
+#Find the largest increase in distance
+round(height-height.2,3)
+#Find the step with the largest increase
+max(round(height-height.2,3))
+```
+
+####Dissimilarity matrix contains the dissimilarity between the data points. Dissimilarity is also referred to as "distance." The default distance measure for function dist() in R is Euclidean. The function dist() is used to create the dissimilarity matrix.
+
+Size of the matrix is calculated as follows (n k) combation:
+ n!/(2! * (n-2)!) = (n*n-1)/2
+```{r}
+factorial(25)/(2*factorial(23))
+25*(25-1)/2
+```
+
+
+```{r}
+library(cluster)
+dissimilarity.matrix <- dist(as.matrix(Americas, method="euclidean"))
+#dissimilarity.matrix
+americas_pam <- pam(dissimilarity.matrix,3)
+summary(americas_pam) #Look at the assigned cluster for each data value and it nearest neighboring cluster
+plot(americas_pam) #Silhouette Plot
+```
+
+
+
+
+END
