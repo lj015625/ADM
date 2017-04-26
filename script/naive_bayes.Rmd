@@ -154,7 +154,7 @@ predict(drew_classifier, test)
 
 ```{r sms}
 # read the sms data into the sms data frame
-sms_raw <- read.csv("C:/Users/PhamX/Courses/Fall 2016/BIA 6301/Week 7/sms_spam.csv", stringsAsFactors = FALSE)
+sms_raw <- read.csv("C:/Users/lj015625/Desktop/DataMining Class/Applied_Data_Mining/data/sms_spam.csv", stringsAsFactors = FALSE)
 
 # examine the structure of the sms data
 str(sms_raw)
@@ -291,7 +291,7 @@ Can we make it better? Try using the Laplace option
 ```{r improve}
 ## Step 5: Improving model performance ----
 sms_classifier2 <- naiveBayes(sms_train, sms_raw_train$type, laplace = 1)
-sms_test_pred2 <- predict(sms_classifier2, sms_test)
+sms_test_pred2 <- predict(sms_classifier2, sms_test, positive="spam")
 confusionMatrix(sms_test_pred2, sms_raw_test$type)
 
 ```
