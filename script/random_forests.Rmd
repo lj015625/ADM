@@ -398,25 +398,6 @@ BC_predicted <- predict(mybag, newdata=BC_validate_caret, type="class")
 BC_results.matrix.bag <- confusionMatrix(BC_predicted, actual, positive="malignant") 
 print(BC_results.matrix.bag)
 ```
-```{r}
-library(caret)
-set.seed(123)
-ctrl <- trainControl(method = "cv", number = 10)
-mybag <- train(Class ~ ., data = BC_train_caret, method = "treebag", metric="Accuracy", na.action=na.omit, trControl = ctrl)
-```
-```{r}
-actual <- BC_validate_caret$Class 
-BC_predicted <- predict(mybag, newdata=BC_validate_caret, type="class") 
-BC_results.matrix.bag <- confusionMatrix(BC_predicted, actual, positive="malignant") 
-print(BC_results.matrix.bag)
-```
-
-```{r}
-str(svmBag)
-svmBag$fit
-bagctrl <- bagControl(fit = svmBag$fit, predict = svmBag$pred, aggregate = svmBag$aggregate)
-svmbag <- train(Class ~ ., data = BC_train_caret, "bag", trControl = ctrl, na.action=na.omit, bagControl = bagctrl)
-```
 
 
 ```{r}

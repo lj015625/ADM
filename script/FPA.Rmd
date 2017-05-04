@@ -134,7 +134,7 @@ The original data frame has 9,835 transactions with 169 grocery products. This t
 ```{r}
 library(Matrix)
 library(arules)
-setwd("C:/Users/PhamX/Courses/Spring_2017/BIA_6301/Module_4/data")
+setwd("C:/Users/lj015625/Desktop/DataMining Class/Applied_Data_Mining/data")
 groceries <- read.transactions("groceries.csv", sep = ",") #9,835 transactions with 169 products.
 ```
 
@@ -173,6 +173,7 @@ Element is the frequency of a given number of items (i.e. 1, 2, 3, 4, etc.) boug
 Here is another useful function that allows you to examine individual transactions.
 
 ```{r}
+library(arules)
 inspect(groceries[1:5]) 
 ```
 
@@ -341,7 +342,7 @@ soups_rules <- subset(groceryrules_sorted, items %in% "soups")
 Let's write the rules out to a CSV file.
 
 ```{r}
-write(groceryrules_sorted, file = "C:/Users/PhamX/Courses/Spring_2017/BIA_6301/Module_4/output/groceryrules.csv",
+write(groceryrules_sorted, file = "C:/Users/lj015625/Desktop/DataMining Class/ADM/data/groceryrules.csv",
       sep = ",", quote = TRUE, row.names = FALSE)
 ```
 

@@ -32,7 +32,7 @@ We will use the Teen Market Segmentation dataset from Chapter 9 in the Lantz tex
 # Getting Started
 
 ```{r}
-setwd("C:/Users/PhamX/Courses/Spring_2017/BIA_6301/Module_3/data")
+setwd("C:/Users/lj015625/Desktop/DataMining Class/ADM/data")
 
 teens<-read.csv("snsdata.csv", header=TRUE, sep=",")
 

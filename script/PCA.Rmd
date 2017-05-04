@@ -45,13 +45,13 @@ Link to a section from [Han, Kamber, and Pei](http://mercury.webster.edu/aleshun
 We are going to play with a dataset containing 5,000+ movies from IMDB. The dataset was scrapped, cleaned, and posted by [Chuan Sun](https://www.kaggle.com/deepmatrix/imdb-5000-movie-dataset) on Kaggle. 
 
 ```{r}
-imbd<-read.csv("C:/Users/lj015625/Desktop/DataMining Class/Applied_Data_Mining/data/movie_metadata.csv")
+imbd<-read.csv("C:/Users/lj015625/Desktop/DataMining Class/ADM/data/movie_metadata.csv")
 ```
 
 # A Quick Data Cleaning Exercise
 
 ```{r}
-#str(imbd)
+str(imbd)
 names(imbd)
 summary(imbd[,c(3:6,8:9,13:14,16,19,23,25:28)])
 ```
@@ -77,6 +77,7 @@ library(arules)
 
 movie$plot_keywords<-as.character(movie$plot_keywords)
 
+# split plot keywords to five columns
 movie_2<-cSplit(movie,"plot_keywords",sep="|")
 pk<-select(movie_2,c(28:32))
 
@@ -105,6 +106,8 @@ Concept hierarchies replace "lower level" raw data with "higher level" categorie
 movie_3<-movie
 names(movie_3)
 movie_num<-movie_3[,c(3:6,8:9,13:14,16,19,23,25:28)] #numeric variables
+str(movie_num)
+movie_num$duration <- as.numeric(movie_num$duration)
 hist(movie_num$duration)
 
 summary(movie_num$duration) #notice the 6 NA cases
@@ -447,8 +450,8 @@ First, we need to do some data wrangling.
 
 ```{r}
 library(lubridate)
-LMCI_large<-read.csv("C:/Users/lj015625/Desktop/DataMining Class/Applied_Data_Mining/data/LMCI_month.csv")
-LMCI_small<-read.csv("C:/Users/lj015625/Desktop/DataMining Class/Applied_Data_Mining/data/LMCI_week.csv")
+LMCI_large<-read.csv("C:/Users/lj015625/Desktop/DataMining Class/ADM/data/LMCI_month.csv")
+LMCI_small<-read.csv("C:/Users/lj015625/Desktop/DataMining Class/ADM/data/LMCI_week.csv")
 
 #let's handle the LMCI_small dataset first.
 LMCI_small$date<-ymd(as.character(LMCI_small$DATE)) #we have to convert the DATE into "Date" format.

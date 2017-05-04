@@ -58,7 +58,7 @@ Can we build a model to predict whether a medical professional is likely to be a
 # Exploratory Data Analysis
 
 ```{r}
-setwd("C:/Users/PhamX/Courses/Spring_2017/BIA_6301/Module_2/data")
+setwd("C:/Users/lj015625/Desktop/DataMining Class/ADM/data")
 prescribers<-read.csv("prescribers.csv")
 
 #View(prescribers)
