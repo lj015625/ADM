@@ -238,7 +238,7 @@ We created dummy variables from Random Forest decision tree for the logistic reg
 The sensitivity is 38.06% not as good as Random Forest model.  But we can see duration, p outcome, contact category, month category (except February) are significant terms. Although the sensitivity of this model is low, we learned the following:
 
 - Previous marketing campaign success increases the chance of client subscribe a term deposit.
-- Last contact during high increases the chance of client subscribe a term deposit while last contact during low decreases the chance of client subscribe a term deposit.
+- Last contact duration high increases the chance of client subscribe a term deposit while last contact duration low decreases the chance of client subscribe a term deposit.
 - Unknown contact category decreases the chance client subscribe a term deposit.
 - The month of March, June, September, October, December increases the chance client subscribe a term deposit because they have postive estimates.
 
@@ -338,9 +338,10 @@ legend('bottomright', c("Decision Tree", "Random Forest","Bagging", "Boost", "Lo
 
 ##Summary
 
-At the end of day, we created four different models to estimate the chance of client subscribe term deposit: Decision tree model, Logistic Regression, and Neural Network. 
+At the end of day, we created three different models to estimate the chance of client subscribe term deposit: Decision tree model, Logistic Regression, and Neural Network. 
 *Neural Network has the best sensitivity rate*, *Random Forest has the best ROC curve*. 
-We used variety of ensemble methods (Random Forest, Boosting, Bagging) for decision tree model because a single decision tree model is unstable.  All of them have a higher sensitivity rates.  Out of all three Ensemble Methods Bagging with ten-fold Cross Validation produced a model with the best sensitivity rate.  
+We used variety of ensemble methods (Random Forest, Boosting, Bagging) for decision tree model because a single decision tree model is unstable.  All of them have a higher sensitivity rates.  Out of all three Ensemble Methods Bagging with ten-fold Cross Validation produced a model with the best sensitivity rate.  The decision tree model shows
+long duration contact, successful marketing campaing, certain month increase term deposit, random forest model show those are important predictors.
   
 
 | Methods                          | Sensitivity    |   Kappa        |
